@@ -1,6 +1,7 @@
-//! A real layer host for the client to work against: the inquiry, spam, holding and intents
-//! tuplespaces and the examples channel of owner `b`, opened on the context and shapes this
-//! crate ships, with the client mounted in front of it.
+//! A real layer host for the client and the edge to work against: the inquiry, spam, holding
+//! and intents tuplespaces and the examples channel of owner `b`, opened on the context and
+//! shapes this crate ships, with the client mounted in front of it (and, for the edge's tests,
+//! more spaces beside it).
 
 #![allow(dead_code)]
 
@@ -9,8 +10,8 @@ use std::sync::Arc;
 
 use futures::executor::block_on;
 use ikigai_core::{
-    ArgRef, Capability, EndpointSpace, Error, Exact, Fallback, FnEndpoint, Iri, Kernel, ReprType,
-    Representation, Request, Space, SystemClock, Verb,
+    ArgRef, Capability, Clock, EndpointSpace, Error, Exact, Fallback, FnEndpoint, Iri, Kernel,
+    ReprType, Representation, Request, Space, SystemClock, Verb,
 };
 use ikigai_inquiry::{vocab, Layers, Mount};
 use serde_json::{json, Value};
@@ -18,6 +19,7 @@ use serde_json::{json, Value};
 pub const BRIAN: &str = "urn:collab:participant:brian";
 pub const CHRIS: &str = "urn:collab:participant:chris";
 pub const EDGE: &str = "urn:collab:participant:edge";
+pub const AIRLOCK: &str = "urn:collab:participant:airlock";
 pub const INQ: &str = vocab::INQ;
 pub const EMBEDDER: &str = "urn:test:embed";
 pub const EMBED_DIGEST: &str = "sha256:85462619ee72";
@@ -84,6 +86,16 @@ fn write(dir: &std::path::Path, path: &str, text: &str) {
 }
 
 pub fn fixture(name: &str, mount: impl FnOnce(Mount) -> Mount) -> Fixture {
+    fixture_with(name, mount, Vec::new(), Arc::new(SystemClock))
+}
+
+/// The host and the client, with `more` spaces beside them, under `clock`.
+pub fn fixture_with(
+    name: &str,
+    mount: impl FnOnce(Mount) -> Mount,
+    more: Vec<Arc<dyn Space>>,
+    clock: Arc<dyn Clock>,
+) -> Fixture {
     let dir = std::env::temp_dir().join(format!("ikigai-inquiry-{name}-{}", std::process::id()));
     let (config, state) = (dir.join("config"), dir.join("state"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -118,6 +130,8 @@ pub fn fixture(name: &str, mount: impl FnOnce(Mount) -> Mount) -> Fixture {
          <urn:collab:participant:chris> a <http://xmlns.com/foaf/0.1/Person> .\n\
          <urn:collab:participant:auditor> a <http://xmlns.com/foaf/0.1/Person> .\n\
          <urn:collab:participant:edge> a <http://www.w3.org/ns/prov#SoftwareAgent> ; \
+         <http://www.w3.org/ns/prov#actedOnBehalfOf> <urn:collab:participant:brian> .\n\
+         <urn:collab:participant:airlock> a <http://www.w3.org/ns/prov#SoftwareAgent> ; \
          <http://www.w3.org/ns/prov#actedOnBehalfOf> <urn:collab:participant:brian> .\n",
     );
     let mut manifest = String::new();
@@ -128,13 +142,13 @@ pub fn fixture(name: &str, mount: impl FnOnce(Mount) -> Mount) -> Fixture {
     ] {
         manifest.push_str(&format!(
             "[[mount]]\nlayer = \"{layer}\"\nbrian = {person}\nchris = {person}\n\
-             edge = [\"out\"]\nauditor = [\"read\"]\n\n"
+             edge = [\"out\"]\nairlock = [\"read\"]\nauditor = [\"read\"]\n\n"
         ));
     }
     manifest.push_str(
         "[[mount]]\nlayer = \"examples-b\"\nbrian = [\"say\"]\nchris = [\"say\"]\n\
          auditor = [\"read\"]\n\n[[mount]]\nlayer = \"intents-b\"\nbrian = [\"out\"]\n\
-         chris = [\"out\"]\nauditor = [\"read\"]\n",
+         chris = [\"out\"]\nairlock = [\"read\", \"take\"]\nauditor = [\"read\"]\n",
     );
     write(&config, "collabs/b.toml", &manifest);
     write(
@@ -172,12 +186,13 @@ pub fn fixture(name: &str, mount: impl FnOnce(Mount) -> Mount) -> Fixture {
         }),
     );
     let client = ikigai_inquiry::space(mount(Mount::new(Layers::for_owner("b").unwrap())));
-    let spaces: Vec<Arc<dyn Space>> = vec![
+    let mut spaces: Vec<Arc<dyn Space>> = vec![
         Arc::new(client),
         Arc::new(embedder),
         Arc::new(ikigai_layers::space(&host)),
     ];
-    let kernel = Kernel::new(Arc::new(Fallback::new(spaces))).with_clock(Arc::new(SystemClock));
+    spaces.extend(more);
+    let kernel = Kernel::new(Arc::new(Fallback::new(spaces))).with_clock(clock);
     Fixture {
         dir,
         kernel,

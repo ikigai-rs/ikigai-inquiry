@@ -1,14 +1,67 @@
 //! `ikigai-inquiry`: inquiries from public contact forms, as resources.
 //!
-//! The module will bind, under `urn:iki:inquiry:*`:
+//! The module binds, under `urn:iki:inquiry:*`:
 //!
 //! - the edge half: a router that scores a submitted inquiry and puts it into one layer
-//!   (holding, spam or inquiry), a block set keyed by a hash of the sender, and aggregate
-//!   day counters (not built yet);
+//!   (holding, spam or inquiry), a block set keyed by a hash of the sender, the airlock's
+//!   handler for what people decided, and aggregate day counters. **Built**: [`edge_space`];
 //! - a holding stage that takes each borderline inquiry once, compares it with confirmed spam
 //!   examples, asks a local model only when no example is close, and sends it on. **Built**:
 //!   [`holding_space`];
 //! - a layers client: views and actions that any host mounts. **Built**: [`space`].
+//!
+//! # The edge half
+//!
+//! What runs where a contact form posts. A host opens an [`Edge`] over its sender-key secret
+//! ([`SenderKeys`], 32 bytes read from a file), a [`Store`] and a [`Config`] (the classifier
+//! model, the [`RoutePolicy`] table and the intents layer, all from one owner's [`Layers`]), and
+//! mounts [`edge_space`]:
+//!
+//! | resource | verb | what it does | capability |
+//! |---|---|---|---|
+//! | `urn:iki:inquiry:route` | Sink | scores an inquiry and drops ONE `inq:Inquiry` tuple into the layer the policy picks | `urn:cap:inquiry:route` |
+//! | `urn:iki:inquiry:sender-key` | Source | the key of an `address=` or a `domain=` | `urn:cap:inquiry:sender-key` |
+//! | `urn:iki:inquiry:block:key:{key}` | Exists | the door's check: a block holds now, or `NotFound` | `urn:cap:inquiry:block:check` |
+//! | `urn:iki:inquiry:block:key:{key}` | Source | the block's record | `urn:cap:inquiry:block:read` |
+//! | `urn:iki:inquiry:block:key:{key}` | Delete | lifts the block | `urn:cap:inquiry:block:lift` |
+//! | `urn:iki:inquiry:apply` | Sink | the airlock's handler: applies, then takes, the pending intents | `urn:cap:inquiry:apply` |
+//! | `urn:iki:inquiry:count:date:{date}` | Source | per site: inquiries routed to each layer, and blocked drops | `urn:cap:inquiry:count:read` |
+//! | `urn:iki:inquiry:count:confusion:date:{date}` | Source | score class × a person's label | `urn:cap:inquiry:count:read` |
+//!
+//! The router scores the inquiry through the kernel at `urn:bayes:{model}:score` (an
+//! `ikigai-bayes` model the host mounts) and maps its class through the [`RoutePolicy`]: `ham` to
+//! the inquiry layer, `unsure` to holding, `spam` to spam. It then `out`s one tuple to
+//! `urn:layer:{layer}:tuples`, written by oxttl ([`rdf`]) in the terms the shipped inquiry
+//! shapes admit: `inq:inquiry` (the id, stable across layers), `inq:site`, `inq:text`,
+//! `inq:replyTo`, `inq:name`, `inq:organization`, `inq:sender` (the address key),
+//! `inq:received`, `inq:reason`, and the verdict so far as `inq:class` and `inq:classScore`
+//! (`inq:verdict` and `inq:score` are the holding stage's, when it sends one on). A sender whose address key or
+//! domain key is blocked is dropped before scoring and counted; nothing of the inquiry is
+//! kept. A classifier that cannot answer does not lose the inquiry: it goes where an unsure
+//! one goes, with the verdict `unscored`.
+//!
+//! Apply is the other side of the airlock the layers client writes into: it reads the
+//! intents layer, and for each intent trains or untrains the classifier from the inquiry's
+//! layer copy, or writes or lifts a block, then takes the intent.
+//!
+//! The router and apply reach the classifier and the layers under their caller's capability:
+//! the router's grant holds the model's read capability and each policy layer's `out`; the
+//! airlock's grant holds the model's train capability, each policy layer's `read`, and `read`
+//! and `take` on the intents layer.
+//!
+//! Inquiry text is a stranger's text: data, never instructions. The edge never interprets it,
+//! sends it only to the classifier and the layers the host mounts, and keeps none of it: the
+//! block set holds keys, the counters hold numbers.
+//!
+//! ```
+//! use std::sync::Arc;
+//! use ikigai_inquiry::{Config, Edge, Layers, MemoryStore, SenderKeys};
+//!
+//! let config = Config::new("contact", &Layers::for_owner("brian").unwrap()).unwrap();
+//! let edge = Edge::new(config, SenderKeys::new([7; 32]), Arc::new(MemoryStore::new())).unwrap();
+//! let space = ikigai_inquiry::edge_space(&Arc::new(edge));
+//! # let _ = space;
+//! ```
 //!
 //! # The holding stage
 //!
@@ -60,23 +113,42 @@ use std::sync::Arc;
 use ikigai_core::{EndpointSpace, Exact, UriTemplate};
 
 pub mod action;
+mod block;
+mod count;
 pub mod date;
+mod edge;
+mod endpoints;
 pub mod example;
 pub mod funnel;
 pub mod holding;
+mod key;
 pub mod layer;
 pub mod mount;
 pub mod policy;
+pub mod rdf;
+mod store;
 pub mod text;
+mod time;
 pub mod view;
 pub mod vocab;
 
 pub use action::Action;
+pub use block::{Block, BlockSet, MAX_BLOCKS, MAX_LABEL_CHARS};
+pub use count::{Counts, Day, MAX_SITES_PER_DAY, OTHER_SITE};
+pub use edge::{
+    Config, Edge, RoutePolicy, DEFAULT_BLOCK_DAYS, MAX_FIELD_CHARS, MAX_LAYER_CHARS,
+    MAX_MESSAGE_BYTES, MAX_SITE_CHARS, MAX_TEXT_CHARS,
+};
+pub use endpoints::*;
 pub use example::SpamExample;
 pub use funnel::{Judgment, Reason, Verdict};
 pub use holding::{HoldingStage, HOLDING_STAGE};
+pub use key::{Key, Scope, SenderKeys, MAX_ADDRESS_BYTES, SECRET_BYTES};
 pub use mount::{Layers, Mount, View};
 pub use policy::Policy;
+#[cfg(not(target_family = "wasm"))]
+pub use store::DirStore;
+pub use store::{MemoryStore, Store};
 
 /// The pending inquiries view.
 pub const PENDING_VIEW: &str = "urn:iki:inquiry:view:pending";

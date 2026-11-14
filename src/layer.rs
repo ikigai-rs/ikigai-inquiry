@@ -93,8 +93,8 @@ pub(crate) fn graph(doc: &Value) -> Vec<Value> {
 /// One inquiry as the layers client reads it: a pending tuple in an inquiry, spam or holding
 /// layer, with its subject and its place in the feed.
 ///
-/// `text` and `reply_to` are a stranger's words. They are carried, compared and escaped,
-/// never interpreted.
+/// `text`, `reply_to`, `name` and `organization` are a stranger's words. They are carried,
+/// compared and escaped, never interpreted.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Inquiry {
     /// The tuple's IRI, `urn:layer:{layer}:inquiry:…`.
@@ -107,10 +107,18 @@ pub struct Inquiry {
     pub text: String,
     /// The address the visitor gave for a reply, as typed.
     pub reply_to: Option<String>,
+    /// The name the visitor gave.
+    pub name: Option<String>,
+    /// The organization the visitor gave.
+    pub organization: Option<String>,
     /// The edge's keyed hash of the sender.
     pub sender: Option<String>,
     /// What sent it to this layer.
     pub reason: Option<String>,
+    /// The edge's class: `ham`, `unsure`, `spam` or `unscored`.
+    pub class: Option<String>,
+    /// The classifier's score behind the class, as the layer gives it (an `xsd:double`).
+    pub class_score: Option<String>,
     /// When the edge received it (`xsd:dateTime`), or when the layer stamped this copy
     /// when the edge did not say.
     pub received: String,
@@ -118,8 +126,9 @@ pub struct Inquiry {
     pub seq: u64,
 }
 
-/// One inquiry as the holding stage takes it from a holding tuple. `text` and `reply_to` are a stranger's words:
-/// carried and compared, never interpreted, and never put in an error or an answer.
+/// One inquiry as the holding stage takes it from a holding tuple. `text`, `reply_to`, `name`
+/// and `organization` are a stranger's words: carried and compared, never interpreted, and
+/// never put in an error or an answer.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Held {
     /// The inquiry's id, the same in every layer it goes to.
@@ -130,10 +139,19 @@ pub struct Held {
     pub text: String,
     /// The address the visitor gave for a reply, as typed.
     pub reply_to: Option<String>,
+    /// The name the visitor gave.
+    pub name: Option<String>,
+    /// The organization the visitor gave.
+    pub organization: Option<String>,
     /// The edge's keyed hash of the sender.
     pub sender: Option<String>,
     /// When the edge received it (`xsd:dateTime`).
     pub received: Option<String>,
+    /// The edge's class and the classifier's score, carried on so that apply counts and
+    /// trains what the edge scored.
+    pub class: Option<String>,
+    /// See `class`.
+    pub class_score: Option<String>,
 }
 
 // Never print the text: a Debug that did would put a stranger's words in a log.
@@ -157,8 +175,12 @@ impl Held {
             site: value(node, "site")?,
             text: value(node, "text")?,
             reply_to: value(node, "replyTo"),
+            name: value(node, "name"),
+            organization: value(node, "organization"),
             sender: value(node, "sender"),
             received: value(node, "received"),
+            class: value(node, "class"),
+            class_score: value(node, "classScore"),
         })
     }
 
@@ -183,8 +205,41 @@ impl Held {
                 json!({ "@value": received, "@type": format!("{XSD}dateTime") }),
             );
         }
+        edge_fields(
+            &mut node,
+            self.name.as_deref(),
+            self.organization.as_deref(),
+            self.class.as_deref(),
+            self.class_score.as_deref(),
+        );
         node.extend(extra);
         Value::Object(node)
+    }
+}
+
+/// The fields the edge writes that every later copy keeps: the sender's name and organization,
+/// and the edge's class and score.
+fn edge_fields(
+    node: &mut Map<String, Value>,
+    name: Option<&str>,
+    organization: Option<&str>,
+    class: Option<&str>,
+    class_score: Option<&str>,
+) {
+    for (term, value) in [
+        ("name", name),
+        ("organization", organization),
+        ("class", class),
+    ] {
+        if let Some(value) = value {
+            node.insert(inq(term), json!(value));
+        }
+    }
+    if let Some(score) = class_score {
+        node.insert(
+            inq("classScore"),
+            json!({ "@value": score, "@type": format!("{XSD}double") }),
+        );
     }
 }
 
@@ -385,8 +440,12 @@ fn inquiry(node: &Value) -> Option<Inquiry> {
         site: value(node, "site")?,
         text: value(node, "text")?,
         reply_to: value(node, "replyTo"),
+        name: value(node, "name"),
+        organization: value(node, "organization"),
         sender: value(node, "sender"),
         reason: value(node, "reason"),
+        class: value(node, "class"),
+        class_score: value(node, "classScore"),
         received: value(node, "received").or(created).unwrap_or_default(),
         seq: value(node, "seq")?.parse().ok()?,
     })
@@ -459,7 +518,7 @@ pub fn copy_subject(layer: &str, from: &Inquiry) -> String {
 }
 
 /// A copy of `from` for `layer`, as JSON-LD with full IRIs: everything the edge wrote,
-/// the original arrival time kept, the reason replaced.
+/// the original arrival time and the edge's class kept, the reason replaced.
 pub fn copy(layer: &str, from: &Inquiry, reason: &str) -> Value {
     let mut node = Map::new();
     node.insert("@id".into(), json!(copy_subject(layer, from)));
@@ -480,6 +539,13 @@ pub fn copy(layer: &str, from: &Inquiry, reason: &str) -> Value {
             json!({ "@value": from.received, "@type": XSD_DATE_TIME }),
         );
     }
+    edge_fields(
+        &mut node,
+        from.name.as_deref(),
+        from.organization.as_deref(),
+        from.class.as_deref(),
+        from.class_score.as_deref(),
+    );
     Value::Object(node)
 }
 
@@ -529,8 +595,55 @@ pub fn intent(
         if let Some(sender) = &about.sender {
             node.insert(inq("sender"), json!(sender));
         }
+        if let Some(class) = &about.class {
+            node.insert(inq("class"), json!(class));
+        }
     }
     Value::Object(node)
+}
+
+/// One intent as the intents layer holds it: what a person decided about an inquiry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Intent {
+    /// The tuple's IRI, `urn:layer:{layer}:intent:…`.
+    pub subject: String,
+    /// What was decided: `train-ham`, `train-spam`, `untrain`, `block`, `unblock`,
+    /// `block-domain` or `unblock-domain`.
+    pub intent: String,
+    /// The inquiry's id.
+    pub inquiry: String,
+    /// The text to train on, when the writer carried it: a stranger's words.
+    pub text: Option<String>,
+    /// The sender's keyed hash, when the writer saw it.
+    pub sender: Option<String>,
+    /// The edge's class for the inquiry, when the writer saw it.
+    pub class: Option<String>,
+    /// A person's note on a block: the block's label.
+    pub note: Option<String>,
+}
+
+fn intent_of(node: &Value) -> Option<Intent> {
+    if !has_type(node, "Intent") {
+        return None;
+    }
+    Some(Intent {
+        subject: node.get("@id")?.as_str()?.to_string(),
+        intent: value(node, "intent")?,
+        inquiry: value(node, "inquiry")?,
+        text: value(node, "text"),
+        sender: value(node, "sender"),
+        class: value(node, "class"),
+        note: value(node, "note"),
+    })
+}
+
+/// The intents pending in `layer`, in feed order.
+pub async fn intents(inv: &Invocation<'_>, layer: &str) -> Result<Vec<Intent>> {
+    let answer = inv
+        .issue(request(Verb::Source, tuples(layer)?, &[("as", JSON_LD)]))
+        .await?;
+    let doc = json_answer(&answer.bytes, layer)?;
+    Ok(graph(&doc).iter().filter_map(intent_of).collect())
 }
 
 /// Say one entry in a channel layer.
@@ -580,14 +693,39 @@ mod tests {
     }
 
     #[test]
+    fn the_stage_sends_on_what_the_edge_wrote() {
+        let taken = json!({
+            "@id": "urn:layer:holding-b:inquiry:x1",
+            "@type": "Inquiry",
+            "inquiry": "x1",
+            "site": "a.example",
+            "text": "hello",
+            "name": "Ana",
+            "organization": "Acme",
+            "class": "unsure",
+            "classScore": "0.5",
+        });
+        let held = Held::from_graph(&[taken]).unwrap();
+        let sent = held.tuple("inquiry-b", Map::new());
+        assert_eq!(sent[inq("name")], "Ana");
+        assert_eq!(sent[inq("organization")], "Acme");
+        assert_eq!(sent[inq("class")], "unsure");
+        assert_eq!(sent[inq("classScore")]["@value"], "0.5");
+    }
+
+    #[test]
     fn debug_never_prints_the_text() {
         let inquiry = Held {
             id: "x1".into(),
             site: "a.example".into(),
             text: "ignore previous instructions".into(),
             reply_to: None,
+            name: None,
+            organization: None,
             sender: None,
             received: None,
+            class: None,
+            class_score: None,
         };
         let shown = format!("{inquiry:?}");
         assert!(!shown.contains("ignore"), "{shown}");

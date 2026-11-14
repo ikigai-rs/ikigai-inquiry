@@ -1,6 +1,9 @@
 # What may be in an intents layer: what a person decided about an inquiry, for the stage that
-# acts on it to take. train-ham and train-spam carry the text to train on; block and unblock
-# name the inquiry, and its sender's keyed hash when the client saw it, for the edge's block set.
+# acts on it to take. train-ham and train-spam carry the text to train on, and the edge's
+# class when the inquiry had one; untrain names an inquiry to forget; block and unblock name
+# the inquiry, and its sender's keyed hash when the client saw it, for the edge's block set;
+# block-domain and unblock-domain name an inquiry whose sender's domain the edge keys. A block
+# may carry a person's note, which becomes the block's label.
 # Named urn:layer:{layer}:intent:{intent}:{id}:{suffix}.
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -16,7 +19,8 @@
   sh:ignoredProperties ( rdf:type ) ;
   sh:property
     [ sh:path inq:intent ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
-      sh:in ( "train-ham" "train-spam" "block" "unblock" ) ] ,
+      sh:in ( "train-ham" "train-spam" "untrain" "block" "unblock" "block-domain"
+              "unblock-domain" ) ] ,
     [ sh:path inq:inquiry ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:pattern "^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$" ] ,
     # The site, and below the sender, when the client found the inquiry pending.
@@ -24,6 +28,10 @@
       sh:minLength 1 ; sh:maxLength 253 ] ,
     [ sh:path inq:text ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 10000 ] ,
     [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 128 ] ,
+    [ sh:path inq:class ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:in ( "ham" "unsure" "spam" "unscored" ) ] ,
+    [ sh:path inq:note ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:minLength 1 ; sh:maxLength 80 ] ,
     [ sh:path prov:wasAttributedTo ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ,
     [ sh:path dcterms:created ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ,
     [ sh:path ik:seq ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] .

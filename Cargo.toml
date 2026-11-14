@@ -25,11 +25,22 @@ serde_json = "1"
 # A confirmed example's embedding is base64 of little-endian f32s. 0.22.1 is the line the
 # layer host links, so nothing new is compiled. ⚠ `"0.22.1"` is `<0.23.0`.
 base64 = "0.22.1"
+# The keyed hash behind sender keys and inquiry ids (its keyed mode, nothing else).
+blake3 = "1"
+# The RDF library that writes the edge's inquiry tuple: no Turtle is escaped by hand.
+oxrdf = "0.3"
+oxttl = "0.2"
+
+# oxrdf draws on `rand` for blank-node ids; on wasm32-unknown-unknown its entropy comes from the
+# JS host (ikigai-rdf does the same). This crate never mints a blank node.
+[target.'cfg(target_family = "wasm")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 futures = "0.3"
 # The tests run against a real layer host, opened on the shapes and context this crate ships,
-# so what the client and the stage write, take and race on is what the layers actually admit.
+# so what the edge, the client and the stage write, take and race on is what the layers
+# actually admit.
 ikigai-layers = "0.10.1"
 age = { version = "0.11.1", default-features = false }
 # The views are well-formed, so a test reads their structure as XML.
