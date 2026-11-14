@@ -16,8 +16,23 @@ Every action is a resource too (not spam, confirm as spam, block the sender, res
 views and actions are a client any host can mount. Senders are blocked by a keyed hash of
 their address, never the address itself, and nothing tracks an individual.
 
-**Status:** the layers client is built; the edge and the holding stage are not. The design is
+**Status:** the layers client and the holding stage are built; the edge is not. The design is
 ledger #3680; nothing is published yet.
+
+## The holding stage
+
+`urn:iki:inquiry:stage:name:holding` is a Sink a host runs on a schedule with `min-age=` from
+its policy (`holding_space(Policy::for_owner("brian")?)`). Each pass takes every holding
+inquiry at least that old, once, by its subject (two workers may run; the second is told who
+took it first and moves on), compares it with the confirmed spam examples the same embedding
+model made, asks a local model only when none is close, and sends it to spam or inquiry. Any
+failure sends it to inquiry marked `unjudged`, never back. A shadow switch records what it
+would do and sends everything to inquiry.
+
+The confirmed examples are the `inq:SpamExample` entries of the examples channel, which the
+layers client's `confirm-spam` writes. An example carries its embedding only when the mount
+has an embedder (`Mount::embedder`, the `urn:llm:embed` contract, with the stage's model), and
+the stage compares only examples the same model and digest embedded.
 
 ## The layers client
 
@@ -48,9 +63,10 @@ and the examples channel. The tests open a real `ikigai-layers` host on exactly 
 
 ## Accessibility
 
-The layers client's two views and its action messages are what this crate emits for people to
-read. [ACCESSIBILITY.md](ACCESSIBILITY.md) says which rules they follow, how they are tested and
-what is not yet known, and how to report a barrier: an issue carrying the `accessibility` label.
+The layers client's two views and its action messages, and the holding stage's plain-text
+answer, are what this crate emits for people to read. [ACCESSIBILITY.md](ACCESSIBILITY.md)
+says which rules they follow, how they are tested and what is not yet known, and how to report
+a barrier: an issue carrying the `accessibility` label.
 
 ## License
 

@@ -1,10 +1,13 @@
 //! The words an inquiry is written in, and the files a layer host opens to admit them.
 //!
-//! A deployment copies these beside its layer definitions: one context for every layer, and
-//! one shapes file per kind of layer (inquiry, spam and holding share [`INQUIRY_SHAPES`]).
+//! A deployment copies these beside its layer definitions: one context for every layer, the
+//! inquiry shapes for the holding, spam and inquiry layers, the example shapes for the channel
+//! of confirmed spam examples, and the intent shapes for the intents layer.
 
 /// The namespace of the inquiry terms, `inq:`.
 pub const INQ: &str = "https://ikigai-rs.dev/ns/inquiry#";
+
+pub(crate) const XSD: &str = "http://www.w3.org/2001/XMLSchema#";
 
 pub(crate) const XSD_DATE_TIME: &str = "http://www.w3.org/2001/XMLSchema#dateTime";
 
@@ -14,11 +17,17 @@ pub const CONTEXT: &str = include_str!("../layers/inquiry.context.jsonld");
 /// The closed shapes of an inquiry, spam or holding layer: `layers/inquiry.shapes.ttl`.
 pub const INQUIRY_SHAPES: &str = include_str!("../layers/inquiry.shapes.ttl");
 
-/// The closed shapes of the examples channel: `layers/example.shapes.ttl`.
+/// The closed shapes of the examples channel, `inq:SpamExample` entries:
+/// `layers/example.shapes.ttl`.
 pub const EXAMPLE_SHAPES: &str = include_str!("../layers/example.shapes.ttl");
 
 /// The closed shapes of the intents layer: `layers/intent.shapes.ttl`.
 pub const INTENT_SHAPES: &str = include_str!("../layers/intent.shapes.ttl");
+
+/// `inq:{local}`.
+pub(crate) fn inq(local: &str) -> String {
+    format!("{INQ}{local}")
+}
 
 /// Whether `id` is an inquiry id: what the shapes' `sh:pattern` admits.
 pub fn is_inquiry_id(id: &str) -> bool {

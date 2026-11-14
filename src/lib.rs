@@ -6,9 +6,27 @@
 //!   (holding, spam or inquiry), a block set keyed by a hash of the sender, and aggregate
 //!   day counters (not built yet);
 //! - a holding stage that takes each borderline inquiry once, compares it with confirmed spam
-//!   examples, asks a local model only when no example is close, and sends it on (not built
-//!   yet);
+//!   examples, asks a local model only when no example is close, and sends it on. **Built**:
+//!   [`holding_space`];
 //! - a layers client: views and actions that any host mounts. **Built**: [`space`].
+//!
+//! # The holding stage
+//!
+//! | resource | verb | what it is |
+//! | --- | --- | --- |
+//! | `urn:iki:inquiry:stage:name:holding` | Sink | one pass, `min-age=` seconds (text) |
+//!
+//! One set of layers per owner ([`Policy::for_owner`]), the site a field of every inquiry. A
+//! host binds [`holding_space`] over the owner's [`Policy`] and writes to the stage on a
+//! schedule, with `min-age=` from its policy row, under a worker's own grant. Two workers may
+//! run at once: each tuple is taken once, by its subject, and the other is answered
+//! `Conflict` and moves on. [`holding`] says what one pass does, [`funnel`] how an inquiry is
+//! judged, and [`example`] what the confirmed-spam store is.
+//!
+//! Inquiry text is a stranger's text: data, never instructions. The stage never interprets
+//! it, sends it only to the layers, the configured embedder and the configured local
+//! classifier, and never puts it in an answer or an error. The layers seal it at rest, and the
+//! stage stores nothing itself: the confirmed examples are read into memory for each pass.
 //!
 //! # The layers client
 //!
@@ -42,14 +60,23 @@ use std::sync::Arc;
 use ikigai_core::{EndpointSpace, Exact, UriTemplate};
 
 pub mod action;
+pub mod date;
+pub mod example;
+pub mod funnel;
+pub mod holding;
 pub mod layer;
 pub mod mount;
+pub mod policy;
 pub mod text;
 pub mod view;
 pub mod vocab;
 
 pub use action::Action;
+pub use example::SpamExample;
+pub use funnel::{Judgment, Reason, Verdict};
+pub use holding::{HoldingStage, HOLDING_STAGE};
 pub use mount::{Layers, Mount, View};
+pub use policy::Policy;
 
 /// The pending inquiries view.
 pub const PENDING_VIEW: &str = "urn:iki:inquiry:view:pending";
@@ -97,6 +124,12 @@ pub fn space(mount: Mount) -> EndpointSpace {
             );
     }
     space
+}
+
+/// The holding stage of one owner, bound at [`HOLDING_STAGE`]. Built from the host's policy,
+/// so the host names the space.
+pub fn holding_space(policy: Policy) -> EndpointSpace {
+    EndpointSpace::new().bind(Exact::new(HOLDING_STAGE), HoldingStage::new(policy))
 }
 
 fn template(pattern: &str) -> UriTemplate {

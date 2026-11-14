@@ -20,6 +20,7 @@ pub const CHRIS: &str = "urn:collab:participant:chris";
 pub const EDGE: &str = "urn:collab:participant:edge";
 pub const INQ: &str = vocab::INQ;
 pub const EMBEDDER: &str = "urn:test:embed";
+pub const EMBED_DIGEST: &str = "sha256:85462619ee72";
 
 pub struct Fixture {
     dir: PathBuf,
@@ -153,14 +154,20 @@ pub fn fixture(name: &str, mount: impl FnOnce(Mount) -> Mount) -> Fixture {
     }
     let key = ikigai_layers::StateKey::load(config.join("state.key")).unwrap();
     let host = ikigai_layers::Host::open(&config, &state, &key).expect("the shipped shapes open");
-    // A local embedder stand-in: answers a fixed vector's text for any `in`.
+    // A local embedder stand-in on the `urn:llm:embed` contract: `[len, 1]` for any text.
     let embedder = EndpointSpace::new().bind(
         Exact::new(EMBEDDER),
         FnEndpoint::new("test-embed", |inv| {
-            let text = inv.inline_str("in")?;
+            let model = inv.inline_str("model")?;
+            let text = inv.inline_str("text")?;
+            let body = json!({
+                "vector": [text.len() as f32, 1.0],
+                "model": format!("{model}:latest"),
+                "digest": EMBED_DIGEST,
+            });
             Ok(Representation::new(
-                ReprType::new("text/plain"),
-                format!("[{}.0, 1.0]", text.len()).into_bytes(),
+                ReprType::new("application/json"),
+                body.to_string().into_bytes(),
             ))
         }),
     );

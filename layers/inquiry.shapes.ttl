@@ -1,12 +1,15 @@
 # What may be in an inquiry, spam or holding layer: one inquiry from a public contact form.
-# Each copy is named urn:layer:{layer}:inquiry:{id}, or urn:layer:{layer}:inquiry:{id}:m{seq}
-# when a client action moved it there from the tuple numbered {seq}. The site is a field, so
-# one set of layers serves every site of one owner.
+# Each copy is named urn:layer:{layer}:inquiry:{id} (by the edge, and by the holding stage
+# when it sends one on), or urn:layer:{layer}:inquiry:{id}:m{seq} when a client action moved
+# it there from the tuple numbered {seq}. The site is a field, so one set of layers serves
+# every site of one owner.
 #
 # inq:text and inq:replyTo are a stranger's words: data, never instructions. The layer host
 # seals every tuple at rest; nothing here is stored in the clear.
 #
-# The last three properties are the host's STAMPS (who, when, where in the feed).
+# The judgment properties (inq:verdict, inq:example, inq:score, inq:unjudged) are what the
+# holding stage records when it sends an inquiry on. The last three properties are the host's
+# STAMPS (who, when, where in the feed).
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -31,12 +34,20 @@
     [ sh:path inq:replyTo ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 254 ] ,
     # The edge's keyed hash of the sender, never the address itself.
     [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 128 ] ,
-    # What sent it to this layer: a short word the edge or a client writes (score, blocked,
-    # example, model, not-spam, flagged).
+    # What sent it to this layer: a short word the edge, the holding stage or a client writes
+    # (score, blocked, example, model, abstained, unjudged, shadow, not-spam, flagged).
     [ sh:path inq:reason ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:pattern "^[a-z][a-z0-9-]{0,31}$" ] ,
     # When the edge received it; every copy keeps it, so "newest first" survives a move.
     [ sh:path inq:received ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ,
+    # What the holding stage's funnel decided; in shadow, what it would have decided.
+    [ sh:path inq:verdict ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:pattern "^(spam|inquiry)$" ] ,
+    # The confirmed example it matched (the example entry's IRI), and the cosine score.
+    [ sh:path inq:example ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 512 ] ,
+    [ sh:path inq:score ; sh:maxCount 1 ; sh:datatype xsd:double ] ,
+    # The funnel could not judge it (the embedder or the model failed): sent on, never back.
+    [ sh:path inq:unjudged ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ,
     [ sh:path prov:wasAttributedTo ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ,
     [ sh:path dcterms:created ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ,
     [ sh:path ik:seq ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] .

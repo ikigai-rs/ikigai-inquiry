@@ -140,11 +140,15 @@ fn confirm_spam_keeps_an_embedded_example() {
     assert!(pending(&f, "spam-b").is_empty());
     let examples = examples(&f);
     assert_eq!(examples.len(), 1);
-    assert_eq!(examples[0]["@type"], "Example");
+    assert_eq!(examples[0]["@type"], "SpamExample");
     assert_eq!(examples[0]["inquiry"], "s1");
     assert_eq!(examples[0]["site"], "b.example");
     assert_eq!(examples[0]["text"], "Buy now");
-    assert_eq!(examples[0]["embedding"], "[7.0, 1.0]");
+    // What the holding stage compares with: base64 little-endian f32s, the model, the digest.
+    let vector = ikigai_inquiry::example::decode(examples[0]["embedding"].as_str().unwrap());
+    assert_eq!(vector, Some(vec![7.0, 1.0]));
+    assert_eq!(examples[0]["embeddingModel"], "embeddinggemma:latest");
+    assert_eq!(examples[0]["embeddingDigest"], EMBED_DIGEST);
     assert_eq!(examples[0]["attributedTo"], BRIAN);
     let intents = intents(&f);
     assert_eq!(intents.len(), 1);
@@ -159,7 +163,9 @@ fn confirm_spam_without_an_embedder_keeps_the_text() {
     act(&f, &person(BRIAN), "confirm-spam", "s1").unwrap();
     let examples = examples(&f);
     assert_eq!(examples.len(), 1);
-    assert!(examples[0].get("embedding").is_none());
+    for term in ["embedding", "embeddingModel", "embeddingDigest"] {
+        assert!(examples[0].get(term).is_none(), "{term}");
+    }
 }
 
 #[test]

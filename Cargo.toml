@@ -17,13 +17,19 @@ ikigai-core = "0.3.0"
 # `compose` and `each` fill the views, so visitor text reaches a page only through `$h{…}`;
 # `html` is the escaping and link rules the views' Rust side shares with them.
 ikigai-fn = "0.11.0"
+# The actions and the holding stage are `Endpoint`s, whose `invoke` is `async_trait`.
 async-trait = "0.1"
-serde_json = "1.0"
+# The layers' JSON faces (listings, JSON-LD graphs) and `urn:llm:embed`'s answer are JSON, and a
+# tuple is dropped as JSON-LD. ⚠ `"1"` is `<2.0.0`.
+serde_json = "1"
+# A confirmed example's embedding is base64 of little-endian f32s. 0.22.1 is the line the
+# layer host links, so nothing new is compiled. ⚠ `"0.22.1"` is `<0.23.0`.
+base64 = "0.22.1"
 
 [dev-dependencies]
 futures = "0.3"
-# The client's tests run against a real layer host: the shipped shapes and context are
-# what it opens, so a tuple the client writes is one the layers actually admit.
+# The tests run against a real layer host, opened on the shapes and context this crate ships,
+# so what the client and the stage write, take and race on is what the layers actually admit.
 ikigai-layers = "0.10.1"
 age = { version = "0.11.1", default-features = false }
 # The views are well-formed, so a test reads their structure as XML.
