@@ -27,15 +27,32 @@ pub struct Layers {
 }
 
 impl Layers {
-    /// The conventional names for `owner`: `inquiry-{owner}`, `spam-{owner}`,
-    /// `holding-{owner}`, `examples-{owner}` and `intents-{owner}`.
+    /// The conventional names for `owner`: `inquiry-{owner}`, `inquiry-spam-{owner}`,
+    /// `inquiry-hold-{owner}`, `inquiry-example-{owner}` and `inquiry-intent-{owner}`.
+    /// For owners longer than eight characters, all five use `inq-` instead of `inquiry-`
+    /// so the longest (`inq-example-{owner}`) fits the host's 24-character limit.
+    /// Owners must be 1 to 12 lowercase letters, digits or hyphens, starting with a letter
+    /// or digit. Longer owner identities need explicitly configured layer names.
     pub fn for_owner(owner: &str) -> Result<Self> {
+        let prefix = if owner.len() <= 8 { "inquiry" } else { "inq" };
+        if owner.is_empty()
+            || owner.len() > 12
+            || owner.starts_with('-')
+            || !owner
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        {
+            return Err(Error::InvalidArgument {
+                name: "owner".to_string(),
+                detail: "an owner is 1 to 12 lowercase letters, digits or hyphens, starting with a letter or digit".to_string(),
+            });
+        }
         Self {
-            inquiry: format!("inquiry-{owner}"),
-            spam: format!("spam-{owner}"),
-            holding: format!("holding-{owner}"),
-            examples: format!("examples-{owner}"),
-            intents: format!("intents-{owner}"),
+            inquiry: format!("{prefix}-{owner}"),
+            spam: format!("{prefix}-spam-{owner}"),
+            holding: format!("{prefix}-hold-{owner}"),
+            examples: format!("{prefix}-example-{owner}"),
+            intents: format!("{prefix}-intent-{owner}"),
         }
         .checked()
     }
@@ -96,13 +113,13 @@ pub struct Mount {
 
 impl Mount {
     /// A mount over `layers`, showing every view, open to whoever the host lets in, posting
-    /// its buttons to `/inquiry/action/{action}`.
+    /// its buttons to `/inquiry/action/name/{action}`.
     pub fn new(layers: Layers) -> Self {
         Self {
             layers,
             acting: None,
             views: View::ALL.into_iter().collect(),
-            action_base: "/inquiry/action/".to_string(),
+            action_base: "/inquiry/action/name/".to_string(),
             embedder: None,
             embed_model: DEFAULT_EMBED_MODEL.to_string(),
         }
@@ -122,7 +139,7 @@ impl Mount {
     }
 
     /// Where the host routes a POST to an action: a button posts to `{base}{action}`, and
-    /// the host turns that into a Sink of `urn:iki:inquiry:action:{action}` with the form's
+    /// the host turns that into a Sink of `urn:iki:inquiry:action:name:{action}` with the form's
     /// `inquiry` field.
     pub fn action_base(mut self, base: impl Into<String>) -> Self {
         self.action_base = base.into();

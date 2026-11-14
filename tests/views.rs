@@ -108,7 +108,7 @@ fn visitor_text_reaches_the_page_only_escaped() {
             received: "2026-11-14T09:00:00.000Z",
         },
     );
-    let page = view(&f, "urn:iki:inquiry:view:pending", &[]).unwrap();
+    let page = view(&f, "urn:iki:inquiry:view:name:pending", &[]).unwrap();
     for raw in [
         "<script>",
         "<b>evil</b>",
@@ -154,10 +154,10 @@ fn pending_is_by_site_newest_first() {
     // Not pending, so not shown: spam and holding are other layers.
     arrive(
         &f,
-        "spam-b",
+        "inquiry-spam-b",
         arrival("junk", "a.example", "Junk", "2026-11-14T08:00:00.000Z"),
     );
-    let page = view(&f, "urn:iki:inquiry:view:pending", &[]).unwrap();
+    let page = view(&f, "urn:iki:inquiry:view:name:pending", &[]).unwrap();
     assert!(
         page.contains("<p>3 inquiries waiting, from 2 sites."),
         "{page}"
@@ -181,9 +181,9 @@ fn pending_is_by_site_newest_first() {
         page.contains("<time datetime=\"2026-11-14T08:00:00.000Z\">2026-11-14 08:00 UTC</time>")
     );
     // Every button posts to its action with the inquiry's id.
-    assert!(page.contains("action=\"/inquiry/action/respond\""));
-    assert!(page.contains("action=\"/inquiry/action/flag-spam\""));
-    assert!(page.contains("action=\"/inquiry/action/block\""));
+    assert!(page.contains("action=\"/inquiry/action/name/respond\""));
+    assert!(page.contains("action=\"/inquiry/action/name/flag-spam\""));
+    assert!(page.contains("action=\"/inquiry/action/name/block\""));
     assert!(page.contains("name=\"inquiry\" value=\"new\""));
     check_structure(&page);
 }
@@ -191,7 +191,7 @@ fn pending_is_by_site_newest_first() {
 #[test]
 fn an_empty_pending_view_says_so() {
     let f = fixture("pending-empty", |m| m);
-    let page = view(&f, "urn:iki:inquiry:view:pending", &[]).unwrap();
+    let page = view(&f, "urn:iki:inquiry:view:name:pending", &[]).unwrap();
     assert!(page.contains("<p>No inquiries are waiting.</p>"));
     check_structure(&page);
 }
@@ -202,17 +202,17 @@ fn the_spam_summary_counts_by_site_and_reason() {
     let long = format!("{} tail", "Buy cheap watches now ".repeat(10));
     arrive(
         &f,
-        "spam-b",
+        "inquiry-spam-b",
         arrival("s1", "a.example", &long, "2026-11-14T07:00:00.000Z"),
     );
     arrive(
         &f,
-        "spam-b",
+        "inquiry-spam-b",
         arrival("s2", "a.example", HOSTILE, "2026-11-14T09:00:00.000Z"),
     );
     arrive(
         &f,
-        "spam-b",
+        "inquiry-spam-b",
         Arrival {
             reason: "blocked",
             ..arrival("s3", "b.example", "Hi", "2026-11-14T08:00:00.000Z")
@@ -220,10 +220,15 @@ fn the_spam_summary_counts_by_site_and_reason() {
     );
     arrive(
         &f,
-        "spam-b",
+        "inquiry-spam-b",
         arrival("s4", "a.example", "Yesterday", "2026-11-13T23:59:00.000Z"),
     );
-    let page = view(&f, "urn:iki:inquiry:view:spam", &[("day", "2026-11-14")]).unwrap();
+    let page = view(
+        &f,
+        "urn:iki:inquiry:view:name:spam",
+        &[("day", "2026-11-14")],
+    )
+    .unwrap();
     assert!(page.contains("<title>Spam for 2026-11-14</title>"));
     assert!(
         page.contains("<p>3 arrivals on 2026-11-14 still waiting, from 2 sites."),
@@ -262,13 +267,22 @@ fn the_spam_summary_counts_by_site_and_reason() {
 #[test]
 fn a_quiet_day_says_so_and_today_is_the_default() {
     let f = fixture("spam-empty", |m| m);
-    let page = view(&f, "urn:iki:inquiry:view:spam", &[("day", "2026-01-01")]).unwrap();
+    let page = view(
+        &f,
+        "urn:iki:inquiry:view:name:spam",
+        &[("day", "2026-01-01")],
+    )
+    .unwrap();
     assert!(page.contains("<p>No spam arrived on 2026-01-01 that is still waiting.</p>"));
     check_structure(&page);
-    let today = view(&f, "urn:iki:inquiry:view:spam", &[]).unwrap();
+    let today = view(&f, "urn:iki:inquiry:view:name:spam", &[]).unwrap();
     assert!(today.contains("<title>Spam for 20"), "{today}");
     assert!(matches!(
-        view(&f, "urn:iki:inquiry:view:spam", &[("day", "14/11/2026")]),
+        view(
+            &f,
+            "urn:iki:inquiry:view:name:spam",
+            &[("day", "14/11/2026")]
+        ),
         Err(Error::InvalidArgument { .. })
     ));
 }
@@ -276,9 +290,13 @@ fn a_quiet_day_says_so_and_today_is_the_default() {
 #[test]
 fn a_mount_shows_only_its_views() {
     let f = fixture("only-pending", |m| m.views([View::Pending]));
-    assert!(view(&f, "urn:iki:inquiry:view:pending", &[]).is_ok());
+    assert!(view(&f, "urn:iki:inquiry:view:name:pending", &[]).is_ok());
     assert!(matches!(
-        view(&f, "urn:iki:inquiry:view:spam", &[("day", "2026-11-14")]),
+        view(
+            &f,
+            "urn:iki:inquiry:view:name:spam",
+            &[("day", "2026-11-14")]
+        ),
         Err(Error::Unresolved(_))
     ));
 }
@@ -286,15 +304,51 @@ fn a_mount_shows_only_its_views() {
 #[test]
 fn a_view_reads_under_the_persons_grant() {
     let f = fixture("grant", |m| m);
-    let cap = ikigai_core::Capability::scoped(["urn:cap:layer:read:spam-b".to_string()])
+    let cap = ikigai_core::Capability::scoped(["urn:cap:layer:read:inquiry-spam-b".to_string()])
         .with_principal(BRIAN)
         .unwrap();
     let refused = common::issue(
         &f.kernel,
         &cap,
         Verb::Source,
-        "urn:iki:inquiry:view:pending",
+        "urn:iki:inquiry:view:name:pending",
         &[],
     );
     assert!(matches!(refused, Err(Error::Denied(_))), "{refused:?}");
+}
+
+#[test]
+fn keyed_data_and_named_templates_are_bound_without_old_aliases() {
+    let f = fixture("resource-naming", |m| m);
+    for iri in [
+        "urn:iki:inquiry:data:pending:site:612e6578616d706c65",
+        "urn:iki:inquiry:data:spam:date:2026-11-14:part:site",
+        "urn:iki:inquiry:data:spam:date:2026-11-14:part:reason",
+        "urn:iki:inquiry:data:spam:date:2026-11-14:part:item",
+    ] {
+        assert_eq!(view(&f, iri, &[]).unwrap(), "[]");
+    }
+    for name in [
+        "pending-section",
+        "pending-row",
+        "spam-body",
+        "spam-row",
+        "count-row",
+    ] {
+        let iri = format!("urn:iki:inquiry:template:name:{name}");
+        assert!(!view(&f, &iri, &[]).unwrap().is_empty());
+    }
+    for old in [
+        "urn:iki:inquiry:view:pending",
+        "urn:iki:inquiry:ui:pending-row",
+        "urn:iki:inquiry:part:pending-section",
+        "urn:iki:inquiry:data:pending:612e6578616d706c65",
+        "urn:iki:inquiry:data:spam:2026-11-14:items",
+    ] {
+        let result = view(&f, old, &[]);
+        assert!(
+            matches!(result, Err(Error::Unresolved(_))),
+            "{old}: {result:?}"
+        );
+    }
 }

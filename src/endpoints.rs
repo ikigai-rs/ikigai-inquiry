@@ -40,7 +40,7 @@ pub const BLOCK: &str = "urn:iki:inquiry:block:key:{key}";
 /// The day counters' template.
 pub const COUNT: &str = "urn:iki:inquiry:count:date:{date}";
 /// The day confusion counters' template.
-pub const CONFUSION: &str = "urn:iki:inquiry:count:confusion:date:{date}";
+pub const CONFUSION: &str = "urn:iki:inquiry:count:kind:confusion:date:{date}";
 
 /// The capability the router requires.
 pub const CAP_ROUTE: &str = "urn:cap:inquiry:route";
@@ -817,7 +817,9 @@ impl Endpoint for Apply {
             .requires(CAP_APPLY)
             .input(
                 ArgSpec::new("intent")
-                    .summary("one intent's tuple, urn:layer:{layer}:intent:…; every one if absent")
+                    .summary(
+                        "one intent's tuple, urn:layer:{layer}:intent:name:…; every one if absent",
+                    )
                     .class(format!("{XSD}anyURI"))
                     .optional(),
             )
@@ -829,7 +831,7 @@ impl Endpoint for Apply {
 
 // --- the counters -------------------------------------------------------------------------
 
-/// `urn:iki:inquiry:count:date:{date}` and `…:confusion:date:{date}`.
+/// `urn:iki:inquiry:count:date:{date}` and `…:kind:confusion:date:{date}`.
 struct CountDoor(Arc<Edge>, bool);
 
 #[async_trait]

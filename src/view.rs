@@ -1,4 +1,4 @@
-//! The views: `urn:iki:inquiry:view:pending` and `urn:iki:inquiry:view:spam`, each a whole
+//! The views: `urn:iki:inquiry:view:name:pending` and `urn:iki:inquiry:view:name:spam`, each a whole
 //! HTML page.
 //!
 //! Every piece of visitor text, and everything the module writes from it (an excerpt, a
@@ -23,11 +23,11 @@ use crate::layer::{self, Inquiry};
 use crate::mount::Mount;
 use crate::text;
 
-pub(crate) const EACH: &str = "urn:iki:inquiry:fn:each";
-pub(crate) const PENDING_SECTION: &str = "urn:iki:inquiry:part:pending-section";
-pub(crate) const SPAM_BODY: &str = "urn:iki:inquiry:part:spam-body";
-pub(crate) const PENDING_SECTION_TEMPLATE: &str = "urn:iki:inquiry:ui:pending-section";
-pub(crate) const SPAM_BODY_TEMPLATE: &str = "urn:iki:inquiry:ui:spam-body";
+pub(crate) const EACH: &str = "urn:iki:inquiry:function:name:each";
+pub(crate) const PENDING_SECTION: &str = "urn:iki:inquiry:template:name:pending-section-rendered";
+pub(crate) const SPAM_BODY: &str = "urn:iki:inquiry:template:name:spam-body-rendered";
+pub(crate) const PENDING_SECTION_TEMPLATE: &str = "urn:iki:inquiry:template:name:pending-section";
+pub(crate) const SPAM_BODY_TEMPLATE: &str = "urn:iki:inquiry:template:name:spam-body";
 
 /// The templates, by IRI: `(iri, endpoint name, text)`.
 pub(crate) fn templates(mount: &Mount) -> Vec<(&'static str, &'static str, String)> {
@@ -44,7 +44,7 @@ pub(crate) fn templates(mount: &Mount) -> Vec<(&'static str, &'static str, Strin
     let pending_section = format!(
         "<section aria-labelledby=\"site-$h{{{{key}}}}\">\n\
          <h2 id=\"site-$h{{{{key}}}}\">$h{{{{site}}}}</h2>\n\
-         <ol>\n$r{{{EACH}?src=urn:iki:inquiry:data:pending:{{key}}&template=urn:iki:inquiry:ui:pending-row}}</ol>\n\
+         <ol>\n$r{{{EACH}?src=urn:iki:inquiry:data:pending:site:{{key}}&template=urn:iki:inquiry:template:name:pending-row}}</ol>\n\
          </section>\n"
     );
     let pending_row = format!(
@@ -66,13 +66,13 @@ pub(crate) fn templates(mount: &Mount) -> Vec<(&'static str, &'static str, Strin
             "<section aria-labelledby=\"by-{part}\">\n<h2 id=\"by-{part}\">{heading}</h2>\n\
              <table aria-labelledby=\"by-{part}\">\n<thead><tr><th scope=\"col\">{column}</th>\
              <th scope=\"col\">Arrivals</th></tr></thead>\n<tbody>\n\
-             $r{{{EACH}?src=urn:iki:inquiry:data:spam:{{day}}:{part}&template=urn:iki:inquiry:ui:count-row}}\
+             $r{{{EACH}?src=urn:iki:inquiry:data:spam:date:{{day}}:part:{part}&template=urn:iki:inquiry:template:name:count-row}}\
              </tbody>\n</table>\n</section>\n"
         )
     };
     let spam_body = format!(
         "{}{}<section aria-labelledby=\"arrivals\">\n<h2 id=\"arrivals\">Arrivals</h2>\n<ol>\n\
-         $r{{{EACH}?src=urn:iki:inquiry:data:spam:{{day}}:items&template=urn:iki:inquiry:ui:spam-row}}\
+         $r{{{EACH}?src=urn:iki:inquiry:data:spam:date:{{day}}:part:item&template=urn:iki:inquiry:template:name:spam-row}}\
          </ol>\n</section>\n",
         count_table("site", "Arrivals by site", "Site"),
         count_table("reason", "Arrivals by what sent them to spam", "Sent by"),
@@ -97,18 +97,18 @@ pub(crate) fn templates(mount: &Mount) -> Vec<(&'static str, &'static str, Strin
             pending_section,
         ),
         (
-            "urn:iki:inquiry:ui:pending-row",
+            "urn:iki:inquiry:template:name:pending-row",
             "inquiry-ui-pending-row",
             pending_row,
         ),
         (SPAM_BODY_TEMPLATE, "inquiry-ui-spam-body", spam_body),
         (
-            "urn:iki:inquiry:ui:spam-row",
+            "urn:iki:inquiry:template:name:spam-row",
             "inquiry-ui-spam-row",
             spam_row,
         ),
         (
-            "urn:iki:inquiry:ui:count-row",
+            "urn:iki:inquiry:template:name:count-row",
             "inquiry-ui-count-row",
             count_row,
         ),
@@ -168,7 +168,7 @@ fn pending_row(inquiry: &Inquiry) -> Value {
     })
 }
 
-/// The pending inquiries of one site, newest first: `urn:iki:inquiry:data:pending:{key}`.
+/// The pending inquiries of one site, newest first: `urn:iki:inquiry:data:pending:site:{key}`.
 pub(crate) struct PendingData(pub(crate) Arc<Mount>);
 
 #[async_trait]
@@ -190,8 +190,8 @@ impl Endpoint for PendingData {
     }
 }
 
-/// A day's spam, as rows: `urn:iki:inquiry:data:spam:{day}:{part}`, `part` one of `site`,
-/// `reason` (label and count, most first) or `items` (newest first).
+/// A day's spam, as rows: `urn:iki:inquiry:data:spam:date:{day}:part:{part}`, `part` one of `site`,
+/// `reason` (label and count, most first) or `item` (newest first).
 pub(crate) struct SpamData(pub(crate) Arc<Mount>);
 
 async fn days_spam(inv: &Invocation<'_>, mount: &Mount, day: &str) -> Result<Vec<Inquiry>> {
@@ -228,7 +228,7 @@ impl Endpoint for SpamData {
             "reason" => Ok(rows(counts(
                 spam.iter().map(|i| text::reason(i.reason.as_deref())),
             ))),
-            "items" => Ok(rows(
+            "item" => Ok(rows(
                 spam.iter()
                     .map(|i| {
                         json!({
@@ -243,7 +243,7 @@ impl Endpoint for SpamData {
                     .collect(),
             )),
             other => Err(Error::NotFound(format!(
-                "no spam summary part `{other}`: site, reason or items"
+                "no spam summary part `{other}`: site, reason or item"
             ))),
         }
     }
@@ -315,7 +315,7 @@ async fn fill(inv: &Invocation<'_>, iri: &str, args: &[(&str, &str)]) -> Result<
         .map_err(|_| Error::Endpoint(format!("`{iri}` did not answer UTF-8 text")))
 }
 
-/// `urn:iki:inquiry:view:pending`: the pending inquiries, a section per site (by name), each
+/// `urn:iki:inquiry:view:name:pending`: the pending inquiries, a section per site (by name), each
 /// newest first.
 pub(crate) struct PendingView(pub(crate) Arc<Mount>);
 
@@ -359,7 +359,7 @@ impl Endpoint for PendingView {
     }
 }
 
-/// `urn:iki:inquiry:view:spam`: one day's spam (`day=YYYY-MM-DD`, today in UTC by the kernel
+/// `urn:iki:inquiry:view:name:spam`: one day's spam (`day=YYYY-MM-DD`, today in UTC by the kernel
 /// clock when absent).
 pub(crate) struct SpamView(pub(crate) Arc<Mount>);
 

@@ -1,4 +1,4 @@
-//! The actions: each a Sink, `urn:iki:inquiry:action:{action} inquiry=<id>`, run under the
+//! The actions: each a Sink, `urn:iki:inquiry:action:name:{action} inquiry=<id>`, run under the
 //! caller's own grant.
 //!
 //! A move is OUT the new copy, THEN TAKE the old one, so a failure between the two leaves the
@@ -66,9 +66,9 @@ impl Action {
         }
     }
 
-    /// `urn:iki:inquiry:action:{name}`.
+    /// `urn:iki:inquiry:action:name:{name}`.
     pub fn iri(self) -> String {
-        format!("urn:iki:inquiry:action:{}", self.name())
+        format!("urn:iki:inquiry:action:name:{}", self.name())
     }
 
     fn summary(self) -> &'static str {

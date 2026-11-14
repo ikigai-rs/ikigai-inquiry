@@ -27,7 +27,7 @@ fn ids(nodes: &[Value]) -> Vec<String> {
 }
 
 fn intents(f: &Fixture) -> Vec<Value> {
-    pending(f, "intents-b")
+    pending(f, "inquiry-intent-b")
 }
 
 #[test]
@@ -35,18 +35,18 @@ fn not_spam_moves_to_inquiry_and_asks_to_train_ham() {
     let f = fixture("not-spam", |m| m);
     arrive(
         &f,
-        "spam-b",
+        "inquiry-spam-b",
         arrival("a1", "a.example", "Hello, a real question."),
     );
     let said = act(&f, &person(BRIAN), "not-spam", "a1").unwrap();
     assert_eq!(said, "Moved inquiry a1 from spam to your inquiries.");
 
-    assert!(pending(&f, "spam-b").is_empty());
+    assert!(pending(&f, "inquiry-spam-b").is_empty());
     let inquiry = pending(&f, "inquiry-b");
     assert_eq!(ids(&inquiry), ["a1"]);
     let copy = &inquiry[0];
     // Named by the copy it came from, and written by the person, not the edge.
-    assert_eq!(copy["@id"], "urn:layer:inquiry-b:inquiry:a1:m1");
+    assert_eq!(copy["@id"], "urn:layer:inquiry-b:inquiry:id:a1:move:1");
     assert_eq!(copy["attributedTo"], BRIAN);
     assert_eq!(copy["reason"], "not-spam");
     assert_eq!(copy["site"], "a.example");
@@ -69,15 +69,15 @@ fn the_copy_is_out_before_the_old_is_taken() {
     // A person who may write to inquiry but not take from spam: the copy is written, the
     // take is refused, and the inquiry is in both layers, never in neither.
     let f = fixture("order", |m| m);
-    arrive(&f, "spam-b", arrival("a1", "a.example", "text"));
+    arrive(&f, "inquiry-spam-b", arrival("a1", "a.example", "text"));
     let scopes: Vec<String> = person_scopes()
         .into_iter()
-        .filter(|s| s != "urn:cap:layer:take:spam-b")
+        .filter(|s| s != "urn:cap:layer:take:inquiry-spam-b")
         .collect();
     let cap = Capability::scoped(scopes).with_principal(BRIAN).unwrap();
     let refused = act(&f, &cap, "not-spam", "a1").unwrap_err();
     assert!(matches!(refused, Error::Denied(_)), "{refused:?}");
-    assert_eq!(ids(&pending(&f, "spam-b")), ["a1"]);
+    assert_eq!(ids(&pending(&f, "inquiry-spam-b")), ["a1"]);
     assert_eq!(ids(&pending(&f, "inquiry-b")), ["a1"]);
     assert!(intents(&f).is_empty(), "no take, no intent");
 }
@@ -85,7 +85,7 @@ fn the_copy_is_out_before_the_old_is_taken() {
 #[test]
 fn an_action_on_an_inquiry_another_took_is_a_conflict() {
     let f = fixture("conflict", |m| m);
-    arrive(&f, "spam-b", arrival("a1", "a.example", "text"));
+    arrive(&f, "inquiry-spam-b", arrival("a1", "a.example", "text"));
     act(&f, &person(BRIAN), "confirm-spam", "a1").unwrap();
     // Chris, on a page loaded before Brian acted.
     let late = act(&f, &person(CHRIS), "not-spam", "a1").unwrap_err();
@@ -131,13 +131,13 @@ fn confirm_spam_keeps_an_embedded_example() {
     let f = fixture("confirm", |m| {
         m.embedder(ikigai_core::Iri::parse(EMBEDDER).unwrap())
     });
-    arrive(&f, "spam-b", arrival("s1", "b.example", "Buy now"));
+    arrive(&f, "inquiry-spam-b", arrival("s1", "b.example", "Buy now"));
     let said = act(&f, &person(BRIAN), "confirm-spam", "s1").unwrap();
     assert_eq!(
         said,
         "Confirmed inquiry s1 as spam and kept it as an example."
     );
-    assert!(pending(&f, "spam-b").is_empty());
+    assert!(pending(&f, "inquiry-spam-b").is_empty());
     let examples = examples(&f);
     assert_eq!(examples.len(), 1);
     assert_eq!(examples[0]["@type"], "SpamExample");
@@ -159,7 +159,7 @@ fn confirm_spam_keeps_an_embedded_example() {
 #[test]
 fn confirm_spam_without_an_embedder_keeps_the_text() {
     let f = fixture("confirm-plain", |m| m);
-    arrive(&f, "spam-b", arrival("s1", "b.example", "Buy now"));
+    arrive(&f, "inquiry-spam-b", arrival("s1", "b.example", "Buy now"));
     act(&f, &person(BRIAN), "confirm-spam", "s1").unwrap();
     let examples = examples(&f);
     assert_eq!(examples.len(), 1);
@@ -171,12 +171,12 @@ fn confirm_spam_without_an_embedder_keeps_the_text() {
 #[test]
 fn remove_takes_from_spam_and_nothing_else() {
     let f = fixture("remove", |m| m);
-    arrive(&f, "spam-b", arrival("s1", "b.example", "Buy now"));
+    arrive(&f, "inquiry-spam-b", arrival("s1", "b.example", "Buy now"));
     assert_eq!(
         act(&f, &person(BRIAN), "remove", "s1").unwrap(),
         "Removed inquiry s1 from spam."
     );
-    assert!(pending(&f, "spam-b").is_empty());
+    assert!(pending(&f, "inquiry-spam-b").is_empty());
     assert!(pending(&f, "inquiry-b").is_empty());
     assert!(examples(&f).is_empty());
     assert!(intents(&f).is_empty());
@@ -188,7 +188,7 @@ fn flag_spam_moves_to_spam_and_asks_to_train_spam() {
     arrive(&f, "inquiry-b", arrival("q1", "a.example", "Cheap pills"));
     act(&f, &person(BRIAN), "flag-spam", "q1").unwrap();
     assert!(pending(&f, "inquiry-b").is_empty());
-    let spam = pending(&f, "spam-b");
+    let spam = pending(&f, "inquiry-spam-b");
     assert_eq!(ids(&spam), ["q1"]);
     assert_eq!(spam[0]["reason"], "flagged");
     assert_eq!(intents(&f)[0]["intent"], "train-spam");
@@ -197,7 +197,7 @@ fn flag_spam_moves_to_spam_and_asks_to_train_spam() {
     act(&f, &person(BRIAN), "not-spam", "q1").unwrap();
     let back = pending(&f, "inquiry-b");
     assert_eq!(ids(&back), ["q1"]);
-    assert_ne!(back[0]["@id"], "urn:layer:inquiry-b:inquiry:q1");
+    assert_ne!(back[0]["@id"], "urn:layer:inquiry-b:inquiry:id:q1");
 }
 
 #[test]
@@ -218,13 +218,13 @@ fn respond_marks_handled() {
 #[test]
 fn block_and_unblock_are_intents_for_the_edge() {
     let f = fixture("block", |m| m);
-    arrive(&f, "spam-b", arrival("s1", "b.example", "Buy now"));
+    arrive(&f, "inquiry-spam-b", arrival("s1", "b.example", "Buy now"));
     assert_eq!(
         act(&f, &person(BRIAN), "block", "s1").unwrap(),
         "Asked to block the sender of inquiry s1."
     );
     // The inquiry stays where it is.
-    assert_eq!(ids(&pending(&f, "spam-b")), ["s1"]);
+    assert_eq!(ids(&pending(&f, "inquiry-spam-b")), ["s1"]);
     act(&f, &person(BRIAN), "remove", "s1").unwrap();
     // Unblocking works after the inquiry is gone: the edge knows the id.
     act(&f, &person(BRIAN), "unblock", "s1").unwrap();
@@ -241,7 +241,7 @@ fn block_and_unblock_are_intents_for_the_edge() {
 #[test]
 fn only_the_acting_identity_acts() {
     let f = fixture("acting", |m: Mount| m.acting_as(BRIAN));
-    arrive(&f, "spam-b", arrival("s1", "b.example", "Buy now"));
+    arrive(&f, "inquiry-spam-b", arrival("s1", "b.example", "Buy now"));
     assert!(matches!(
         act(&f, &person(CHRIS), "remove", "s1"),
         Err(Error::Denied(_))
@@ -251,7 +251,7 @@ fn only_the_acting_identity_acts() {
             &f.kernel,
             &person(CHRIS),
             Verb::Source,
-            "urn:iki:inquiry:view:pending",
+            "urn:iki:inquiry:view:name:pending",
             &[]
         ),
         Err(Error::Denied(_))
@@ -262,12 +262,12 @@ fn only_the_acting_identity_acts() {
 #[test]
 fn every_action_is_a_sink() {
     let f = fixture("sinks", |m| m);
-    arrive(&f, "spam-b", arrival("s1", "b.example", "Buy now"));
+    arrive(&f, "inquiry-spam-b", arrival("s1", "b.example", "Buy now"));
     let sourced = common::issue(
         &f.kernel,
         &person(BRIAN),
         Verb::Source,
-        "urn:iki:inquiry:action:remove",
+        "urn:iki:inquiry:action:name:remove",
         &[("inquiry", "s1")],
     );
     assert!(
@@ -280,5 +280,5 @@ fn every_action_is_a_sink() {
         ),
         "{sourced:?}"
     );
-    assert_eq!(ids(&pending(&f, "spam-b")), ["s1"]);
+    assert_eq!(ids(&pending(&f, "inquiry-spam-b")), ["s1"]);
 }

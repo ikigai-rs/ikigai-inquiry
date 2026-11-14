@@ -127,7 +127,7 @@ impl ikigai_core::Endpoint for GatedEndpoint {
 impl Space for Gated {
     fn resolve(&self, request: &Request, scope: &Scope) -> Resolution {
         let resolution = self.inner.resolve(request, scope);
-        if request.target.as_str() != "urn:layer:holding-b:tuples" {
+        if request.target.as_str() != "urn:layer:inquiry-hold-b:tuples" {
             return resolution;
         }
         let gate = self.gate.clone();
@@ -173,31 +173,34 @@ impl Fixture {
 /// A worker's grant: everything one pass needs, and nothing else.
 pub fn worker(principal: &str) -> Capability {
     Capability::scoped([
-        "urn:cap:layer:read:holding-b",
-        "urn:cap:layer:take:holding-b",
-        "urn:cap:layer:read:spam-b",
-        "urn:cap:layer:out:spam-b",
+        "urn:cap:layer:read:inquiry-hold-b",
+        "urn:cap:layer:take:inquiry-hold-b",
+        "urn:cap:layer:read:inquiry-spam-b",
+        "urn:cap:layer:out:inquiry-spam-b",
         "urn:cap:layer:read:inquiry-b",
         "urn:cap:layer:out:inquiry-b",
-        "urn:cap:layer:read:examples-b",
+        "urn:cap:layer:read:inquiry-example-b",
     ])
     .with_principal(principal)
     .unwrap()
 }
 
 pub fn edge() -> Capability {
-    Capability::scoped(["urn:cap:layer:out:holding-b", "urn:cap:layer:out:spam-b"])
-        .with_principal(EDGE)
-        .unwrap()
+    Capability::scoped([
+        "urn:cap:layer:out:inquiry-hold-b",
+        "urn:cap:layer:out:inquiry-spam-b",
+    ])
+    .with_principal(EDGE)
+    .unwrap()
 }
 
 /// A person: confirms examples, directly or through the client's `confirm-spam`.
 pub fn brian() -> Capability {
     Capability::scoped([
-        "urn:cap:layer:say:examples-b",
-        "urn:cap:layer:read:spam-b",
-        "urn:cap:layer:take:spam-b",
-        "urn:cap:layer:out:intents-b",
+        "urn:cap:layer:say:inquiry-example-b",
+        "urn:cap:layer:read:inquiry-spam-b",
+        "urn:cap:layer:take:inquiry-spam-b",
+        "urn:cap:layer:out:inquiry-intent-b",
     ])
     .with_principal(BRIAN)
     .unwrap()
@@ -206,8 +209,13 @@ pub fn brian() -> Capability {
 /// Reads everything, for the tests' own checks.
 pub fn auditor() -> Capability {
     Capability::scoped(
-        ["inquiry-b", "spam-b", "holding-b", "examples-b"]
-            .map(|l| format!("urn:cap:layer:read:{l}")),
+        [
+            "inquiry-b",
+            "inquiry-spam-b",
+            "inquiry-hold-b",
+            "inquiry-example-b",
+        ]
+        .map(|l| format!("urn:cap:layer:read:{l}")),
     )
     .with_principal("urn:collab:participant:auditor")
     .unwrap()
@@ -232,11 +240,11 @@ pub fn fixture(name: &str, policy: Policy) -> Fixture {
     write(&config, "layers/intent.shapes.ttl", vocab::INTENT_SHAPES);
     write(
         &config,
-        "layers/intents-b.toml",
+        "layers/inquiry-intent-b.toml",
         "model = \"tuplespace\"\nshapes = \"intent.shapes.ttl\"\n\
          context = \"inquiry.context.jsonld\"\n",
     );
-    for layer in ["inquiry-b", "spam-b", "holding-b"] {
+    for layer in ["inquiry-b", "inquiry-spam-b", "inquiry-hold-b"] {
         write(
             &config,
             &format!("layers/{layer}.toml"),
@@ -246,7 +254,7 @@ pub fn fixture(name: &str, policy: Policy) -> Fixture {
     }
     write(
         &config,
-        "layers/examples-b.toml",
+        "layers/inquiry-example-b.toml",
         "model = \"channel\"\nshapes = \"example.shapes.ttl\"\n\
          context = \"inquiry.context.jsonld\"\n",
     );
@@ -263,16 +271,16 @@ pub fn fixture(name: &str, policy: Policy) -> Fixture {
          <http://www.w3.org/ns/prov#actedOnBehalfOf> <urn:collab:participant:brian> .\n",
     );
     let manifest = "\
-        [[mount]]\nlayer = \"holding-b\"\nedge = [\"out\"]\nworker-a = [\"read\", \"take\"]\n\
+        [[mount]]\nlayer = \"inquiry-hold-b\"\nedge = [\"out\"]\nworker-a = [\"read\", \"take\"]\n\
         worker-b = [\"read\", \"take\"]\nauditor = [\"read\"]\n\n\
-        [[mount]]\nlayer = \"spam-b\"\nedge = [\"out\"]\nbrian = [\"read\", \"take\"]\n\
+        [[mount]]\nlayer = \"inquiry-spam-b\"\nedge = [\"out\"]\nbrian = [\"read\", \"take\"]\n\
         worker-a = [\"read\", \"out\"]\n\
         worker-b = [\"read\", \"out\"]\nauditor = [\"read\"]\n\n\
         [[mount]]\nlayer = \"inquiry-b\"\nworker-a = [\"read\", \"out\"]\n\
         worker-b = [\"read\", \"out\"]\nauditor = [\"read\"]\n\n\
-        [[mount]]\nlayer = \"examples-b\"\nbrian = [\"say\"]\nworker-a = [\"read\"]\n\
+        [[mount]]\nlayer = \"inquiry-example-b\"\nbrian = [\"say\"]\nworker-a = [\"read\"]\n\
         worker-b = [\"read\"]\nauditor = [\"read\"]\n\n\
-        [[mount]]\nlayer = \"intents-b\"\nbrian = [\"out\"]\nauditor = [\"read\"]\n";
+        [[mount]]\nlayer = \"inquiry-intent-b\"\nbrian = [\"out\"]\nauditor = [\"read\"]\n";
     write(&config, "collabs/b.toml", manifest);
     write(
         &config,
@@ -394,7 +402,7 @@ pub fn run(f: &Fixture, worker_principal: &str, min_age: u64) -> Result<String, 
 /// What the edge drops into holding: one inquiry.
 pub fn arrive(f: &Fixture, id: &str, words: &str) {
     let node = json!({
-        "@id": format!("urn:layer:holding-b:inquiry:{id}"),
+        "@id": format!("urn:layer:inquiry-hold-b:inquiry:id:{id}"),
         "@type": format!("{INQ}Inquiry"),
         format!("{INQ}inquiry"): id,
         format!("{INQ}site"): "a.example",
@@ -411,7 +419,7 @@ pub fn arrive(f: &Fixture, id: &str, words: &str) {
         &f.kernel,
         &edge(),
         Verb::Sink,
-        "urn:layer:holding-b:tuples",
+        "urn:layer:inquiry-hold-b:tuples",
         &[("content", &node.to_string())],
     )
     .expect("the shapes admit what the edge drops");
@@ -420,7 +428,7 @@ pub fn arrive(f: &Fixture, id: &str, words: &str) {
 /// What the edge drops into spam: one inquiry, for a person to confirm.
 pub fn arrive_spam(f: &Fixture, id: &str, words: &str) {
     let node = json!({
-        "@id": format!("urn:layer:spam-b:inquiry:{id}"),
+        "@id": format!("urn:layer:inquiry-spam-b:inquiry:id:{id}"),
         "@type": format!("{INQ}Inquiry"),
         format!("{INQ}inquiry"): id,
         format!("{INQ}site"): "a.example",
@@ -431,7 +439,7 @@ pub fn arrive_spam(f: &Fixture, id: &str, words: &str) {
         &f.kernel,
         &edge(),
         Verb::Sink,
-        "urn:layer:spam-b:tuples",
+        "urn:layer:inquiry-spam-b:tuples",
         &[("content", &node.to_string())],
     )
     .expect("the shapes admit what the edge drops");
@@ -443,7 +451,7 @@ pub fn confirm_through_client(f: &Fixture, inquiry: &str) -> Result<String, Erro
         &f.kernel,
         &brian(),
         Verb::Sink,
-        "urn:iki:inquiry:action:confirm-spam",
+        "urn:iki:inquiry:action:name:confirm-spam",
         &[("inquiry", inquiry)],
     )
     .map(text)
@@ -466,7 +474,7 @@ pub fn confirm(f: &Fixture, inquiry: &str, words: &str, vector: &[f32], model: &
         &f.kernel,
         &brian(),
         Verb::Sink,
-        "urn:layer:examples-b:say",
+        "urn:layer:inquiry-example-b:say",
         &[("content", &node.to_string())],
     )
     .expect("the shapes admit a confirmed example");
@@ -506,7 +514,7 @@ pub fn example_ids(f: &Fixture) -> Vec<String> {
         &f.kernel,
         &auditor(),
         Verb::Source,
-        "urn:layer:examples-b:entries",
+        "urn:layer:inquiry-example-b:entries",
         &[("as", "application/ld+json")],
     )
     .unwrap();

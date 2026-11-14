@@ -41,9 +41,9 @@ fn tuples(layer: &str) -> Result<Iri> {
     iri(&format!("urn:layer:{layer}:tuples"))
 }
 
-/// The subject inquiry `id` has in `layer`: `urn:layer:{layer}:inquiry:{id}`.
+/// The subject inquiry `id` has in `layer`: `urn:layer:{layer}:inquiry:id:{id}`.
 pub fn inquiry_subject(layer: &str, id: &str) -> String {
-    format!("urn:layer:{layer}:inquiry:{id}")
+    format!("urn:layer:{layer}:inquiry:id:{id}")
 }
 
 /// A node's value for the term `local` as one string. A layer's JSON-LD face compacts with the
@@ -97,7 +97,7 @@ pub(crate) fn graph(doc: &Value) -> Vec<Value> {
 /// compared and escaped, never interpreted.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Inquiry {
-    /// The tuple's IRI, `urn:layer:{layer}:inquiry:…`.
+    /// The tuple's IRI, `urn:layer:{layer}:inquiry:id:…`.
     pub subject: String,
     /// The inquiry's id, the same in every layer a move takes it to.
     pub id: String,
@@ -473,9 +473,9 @@ pub async fn find(inv: &Invocation<'_>, layer: &str, id: &str) -> Result<Option<
     Ok(pending(inv, layer).await?.into_iter().find(|i| i.id == id))
 }
 
-/// Whether `subject` names a copy of inquiry `id`: `…:inquiry:{id}` or `…:inquiry:{id}:…`.
+/// Whether `subject` names a copy of inquiry `id`: `…:inquiry:id:{id}` or `…:inquiry:id:{id}:…`.
 fn names(subject: &str, layer: &str, id: &str) -> bool {
-    let prefix = format!("urn:layer:{layer}:inquiry:{id}");
+    let prefix = format!("urn:layer:{layer}:inquiry:id:{id}");
     subject
         .strip_prefix(&prefix)
         .is_some_and(|rest| rest.is_empty() || rest.starts_with(':'))
@@ -514,7 +514,7 @@ pub async fn absent(inv: &Invocation<'_>, layer: &str, id: &str) -> Error {
 /// The name of a copy of `from` moved into `layer`: deterministic, so a retried action
 /// writes the same tuple again, which the layer answers as a replay.
 pub fn copy_subject(layer: &str, from: &Inquiry) -> String {
-    format!("urn:layer:{layer}:inquiry:{}:m{}", from.id, from.seq)
+    format!("urn:layer:{layer}:inquiry:id:{}:move:{}", from.id, from.seq)
 }
 
 /// A copy of `from` for `layer`, as JSON-LD with full IRIs: everything the edge wrote,
@@ -570,7 +570,7 @@ pub fn example(from: &Inquiry, embedding: Option<&Embedding>) -> Value {
     Value::Object(node)
 }
 
-/// An intent for the intents layer, named `urn:layer:{layer}:intent:{intent}:{id}:{suffix}`.
+/// An intent for the intents layer, named `urn:layer:{layer}:intent:name:{intent}:inquiry:{id}:occurrence:{suffix}`.
 pub fn intent(
     layer: &str,
     intent: &str,
@@ -582,7 +582,9 @@ pub fn intent(
     let mut node = Map::new();
     node.insert(
         "@id".into(),
-        json!(format!("urn:layer:{layer}:intent:{intent}:{id}:{suffix}")),
+        json!(format!(
+            "urn:layer:{layer}:intent:name:{intent}:inquiry:{id}:occurrence:{suffix}"
+        )),
     );
     node.insert("@type".into(), json!(inq("Intent")));
     node.insert(inq("intent"), json!(intent));
@@ -605,7 +607,7 @@ pub fn intent(
 /// One intent as the intents layer holds it: what a person decided about an inquiry.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Intent {
-    /// The tuple's IRI, `urn:layer:{layer}:intent:…`.
+    /// The tuple's IRI, `urn:layer:{layer}:intent:name:…`.
     pub subject: String,
     /// What was decided: `train-ham`, `train-spam`, `untrain`, `block`, `unblock`,
     /// `block-domain` or `unblock-domain`.
@@ -661,17 +663,33 @@ mod tests {
 
     #[test]
     fn a_subject_names_an_id_only_whole() {
-        assert!(names("urn:layer:spam-b:inquiry:a1", "spam-b", "a1"));
-        assert!(names("urn:layer:spam-b:inquiry:a1:m4", "spam-b", "a1"));
-        assert!(!names("urn:layer:spam-b:inquiry:a12", "spam-b", "a1"));
-        assert!(!names("urn:layer:spam-c:inquiry:a1", "spam-b", "a1"));
+        assert!(names(
+            "urn:layer:inquiry-spam-b:inquiry:id:a1",
+            "inquiry-spam-b",
+            "a1"
+        ));
+        assert!(names(
+            "urn:layer:inquiry-spam-b:inquiry:id:a1:move:4",
+            "inquiry-spam-b",
+            "a1"
+        ));
+        assert!(!names(
+            "urn:layer:inquiry-spam-b:inquiry:id:a12",
+            "inquiry-spam-b",
+            "a1"
+        ));
+        assert!(!names(
+            "urn:layer:inquiry-spam-c:inquiry:id:a1",
+            "inquiry-spam-b",
+            "a1"
+        ));
     }
 
     #[test]
     fn a_node_without_its_fields_is_not_an_inquiry() {
-        let node = json!({ "@id": "urn:layer:x:inquiry:a", "@type": "Inquiry", "site": "s" });
+        let node = json!({ "@id": "urn:layer:x:inquiry:id:a", "@type": "Inquiry", "site": "s" });
         assert_eq!(inquiry(&node), None);
-        let node = json!({ "@id": "urn:layer:x:intent:a", "@type": "Intent" });
+        let node = json!({ "@id": "urn:layer:x:intent:name:a", "@type": "Intent" });
         assert_eq!(inquiry(&node), None);
     }
 
@@ -695,7 +713,7 @@ mod tests {
     #[test]
     fn the_stage_sends_on_what_the_edge_wrote() {
         let taken = json!({
-            "@id": "urn:layer:holding-b:inquiry:x1",
+            "@id": "urn:layer:inquiry-hold-b:inquiry:id:x1",
             "@type": "Inquiry",
             "inquiry": "x1",
             "site": "a.example",

@@ -147,7 +147,7 @@ impl Counts {
     }
 
     fn document(date: &str) -> String {
-        format!("count-{date}")
+        format!("count-date-{date}")
     }
 
     fn load<'a>(

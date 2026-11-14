@@ -19,6 +19,38 @@ their address, never the address itself, and nothing tracks an individual.
 **Status:** the edge half, the holding stage and the layers client are built. The design is
 ledger #3680; nothing is published yet.
 
+## Resource names
+
+Names are singular and type first; each partition has a named key. For
+`Layers::for_owner("brian")`, the shared layers are:
+
+| Purpose | Layer name |
+|---|---|
+| Inquiry | `inquiry-brian` |
+| Spam | `inquiry-spam-brian` |
+| Holding | `inquiry-hold-brian` |
+| Confirmed example | `inquiry-example-brian` |
+| Intent | `inquiry-intent-brian` |
+
+The layer host accepts at most 24 lowercase letters, digits or hyphens. Owners of
+1–8 characters use `inquiry-`; owners of 9–12 characters use the shorter shared prefix
+`inq-` for all five layers so `inq-example-{owner}` fits. Owners start with a letter or
+digit. Longer owner identities need explicitly configured layer names.
+`Policy::for_owner` uses the same names and validation.
+
+The client's data resources are `urn:iki:inquiry:data:pending:site:{key}` (the site encoded
+as lowercase UTF-8 hex) and `urn:iki:inquiry:data:spam:date:{day}:part:{part}` (`site`,
+`reason` or `item`). Templates and rendered parts share `urn:iki:inquiry:template:name:{name}`:
+`pending-section`, `pending-row`, `spam-body`, `spam-row`, `count-row`,
+`pending-section-rendered` and `spam-body-rendered`. The iterator is
+`urn:iki:inquiry:function:name:each`; shapes are `urn:iki:inquiry:shape:name:{name}`
+(`inquiry`, `spam-example`, `intent`).
+
+Within the layer host's `urn:layer:{layer}:` namespace, inquiry subjects use
+`inquiry:id:{id}`, moved copies add `:move:{seq}`, and intents use
+`intent:name:{intent}:inquiry:{id}:occurrence:{suffix}`. The edge store uses `block.json`
+and `count-date-{date}.json`. This unpublished crate provides no aliases for previous names.
+
 ## The edge half
 
 What runs where a form posts. A host opens an `Edge` over its 32-byte sender-key file, a store
@@ -31,7 +63,7 @@ and a `Config` over one owner's `Layers`, and mounts `ikigai_inquiry::edge_space
 | `urn:iki:inquiry:block:key:{key}` | Exists / Source / Delete | the door's check (`NotFound` once expired), the block's record, lifting it |
 | `urn:iki:inquiry:apply` | Sink | the airlock's handler: takes the intents the client wrote and trains, untrains, blocks or unblocks |
 | `urn:iki:inquiry:count:date:{date}` | Source | per site: inquiries routed to each layer, blocked drops |
-| `urn:iki:inquiry:count:confusion:date:{date}` | Source | score class × a person's label |
+| `urn:iki:inquiry:count:kind:confusion:date:{date}` | Source | score class × a person's label |
 
 Each door declares its own capability (`urn:cap:inquiry:*`); the crate docs list them, the
 tuple's properties and what the router does when the classifier cannot answer. The tuple is in
@@ -57,18 +89,18 @@ the stage compares only examples the same model and digest embedded.
 A host mounts it with `ikigai_inquiry::space(Mount::new(Layers::for_owner("brian")?))` and
 adds only routing and sign-in. Per mount: whose layers (`Layers`), which identity acts
 (`Mount::acting_as`), which views show (`Mount::views`), where buttons post
-(`Mount::action_base`), and an optional local embedder (`Mount::embedder`).
+(`Mount::action_base`, default `/inquiry/action/name/`), and an optional local embedder (`Mount::embedder`).
 
 | resource | verb | what it is |
 | --- | --- | --- |
-| `urn:iki:inquiry:view:pending` | Source | the pending inquiries, by site, newest first |
-| `urn:iki:inquiry:view:spam` | Source | one day's spam (`day=YYYY-MM-DD`, today by default): arrivals by site and by what sent them there, one-line excerpts |
-| `urn:iki:inquiry:action:remove` | Sink | take from spam; no training, no example |
-| `urn:iki:inquiry:action:not-spam` | Sink | out to inquiry, take from spam, intent `train-ham` |
-| `urn:iki:inquiry:action:confirm-spam` | Sink | an example in the examples channel (embedded when the mount has an embedder), take from spam, intent `train-spam` |
-| `urn:iki:inquiry:action:flag-spam` | Sink | out to spam, take from inquiry, intent `train-spam` |
-| `urn:iki:inquiry:action:block`, `…:unblock` | Sink | an intent for the edge's block set |
-| `urn:iki:inquiry:action:respond` | Sink | take from inquiry: handled (the view offers the `mailto:` link) |
+| `urn:iki:inquiry:view:name:pending` | Source | the pending inquiries, by site, newest first |
+| `urn:iki:inquiry:view:name:spam` | Source | one day's spam (`day=YYYY-MM-DD`, today by default): arrivals by site and by what sent them there, one-line excerpts |
+| `urn:iki:inquiry:action:name:remove` | Sink | take from spam; no training, no example |
+| `urn:iki:inquiry:action:name:not-spam` | Sink | out to inquiry, take from spam, intent `train-ham` |
+| `urn:iki:inquiry:action:name:confirm-spam` | Sink | an example in the examples channel (embedded when the mount has an embedder), take from spam, intent `train-spam` |
+| `urn:iki:inquiry:action:name:flag-spam` | Sink | out to spam, take from inquiry, intent `train-spam` |
+| `urn:iki:inquiry:action:name:block`, `…:unblock` | Sink | an intent for the edge's block set |
+| `urn:iki:inquiry:action:name:respond` | Sink | take from inquiry: handled (the view offers the `mailto:` link) |
 
 Every action takes `inquiry=<id>` and runs under the caller's own grant. A move is OUT the new
 copy, THEN TAKE the old, so a failure between the two leaves the inquiry in both layers, never

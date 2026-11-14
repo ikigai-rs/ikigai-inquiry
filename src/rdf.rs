@@ -42,9 +42,9 @@ fn inq(local: &str) -> NamedNode {
     NamedNode::new_unchecked(format!("{INQ}{local}"))
 }
 
-/// The tuple's subject in `layer`: `urn:layer:{layer}:inquiry:{id}`.
+/// The tuple's subject in `layer`: `urn:layer:{layer}:inquiry:id:{id}`.
 pub fn subject(layer: &str, id: &str) -> String {
-    format!("urn:layer:{layer}:inquiry:{id}")
+    format!("urn:layer:{layer}:inquiry:id:{id}")
 }
 
 impl Arrival {
@@ -126,7 +126,7 @@ mod tests {
             .unwrap();
         // type, inquiry, site, text, replyTo, name, sender, reason, received, class, score.
         assert_eq!(triples.len(), 11);
-        let subject = "urn:layer:holding:inquiry:0123456789abcdef0123456789abcdef";
+        let subject = "urn:layer:holding:inquiry:id:0123456789abcdef0123456789abcdef";
         assert!(triples.iter().all(
             |t| matches!(&t.subject, NamedOrBlankNode::NamedNode(n) if n.as_str() == subject)
         ));
