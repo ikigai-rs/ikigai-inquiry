@@ -12,10 +12,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use ikigai_core::{
-    ArgRef, ArgSpec, Description, Endpoint, Error, Invocation, ReprType, Representation, Request,
-    Result, Verb,
+    ArgSpec, Description, Endpoint, Error, Invocation, ReprType, Representation, Result, Verb,
 };
 
+use crate::funnel::{self, Embedding};
 use crate::layer::{self, Inquiry};
 use crate::mount::Mount;
 use crate::vocab::is_inquiry_id;
@@ -185,16 +185,15 @@ async fn block(inv: &Invocation<'_>, mount: &Mount, intent: &str, id: &str) -> R
     layer::out(inv, &layers.intents, &tuple).await
 }
 
-async fn embed(inv: &Invocation<'_>, mount: &Mount, text: &str) -> Result<Option<String>> {
+/// The example's embedding, when the mount has an embedder. A failing embedder fails the
+/// action before anything is written, so a person can try again.
+async fn embed(inv: &Invocation<'_>, mount: &Mount, text: &str) -> Result<Option<Embedding>> {
     let Some(embedder) = &mount.embedder else {
         return Ok(None);
     };
-    let request = Request::new(Verb::Source, embedder.clone())
-        .with_arg("in", ArgRef::Inline(text.as_bytes().to_vec()));
-    let answer = inv.issue(request).await?;
-    String::from_utf8(answer.bytes)
+    funnel::embed_at(inv, embedder, &mount.embed_model, text, None)
+        .await
         .map(Some)
-        .map_err(|_| Error::Endpoint("the embedder's answer is not UTF-8 text".to_string()))
 }
 
 #[async_trait]
@@ -226,7 +225,12 @@ impl Endpoint for ActionEndpoint {
             Action::ConfirmSpam => {
                 let old = pending(inv, &layers.spam, id).await?;
                 let embedding = embed(inv, mount, &old.text).await?;
-                layer::say(inv, &layers.examples, &layer::example(&old, embedding)).await?;
+                layer::say(
+                    inv,
+                    &layers.examples,
+                    &layer::example(&old, embedding.as_ref()),
+                )
+                .await?;
                 layer::take(inv, &layers.spam, &old.subject).await?;
                 train(inv, mount, "train-spam", &old).await?;
                 format!("Confirmed inquiry {id} as spam and kept it as an example.")

@@ -4,6 +4,8 @@ use std::collections::BTreeSet;
 
 use ikigai_core::{Error, Iri, Result};
 
+use crate::policy::DEFAULT_EMBED_MODEL;
+
 /// The longest layer name a layer host accepts.
 const LAYER_NAME_MAX: usize = 24;
 
@@ -89,6 +91,7 @@ pub struct Mount {
     pub(crate) views: BTreeSet<View>,
     pub(crate) action_base: String,
     pub(crate) embedder: Option<Iri>,
+    pub(crate) embed_model: String,
 }
 
 impl Mount {
@@ -101,6 +104,7 @@ impl Mount {
             views: View::ALL.into_iter().collect(),
             action_base: "/inquiry/action/".to_string(),
             embedder: None,
+            embed_model: DEFAULT_EMBED_MODEL.to_string(),
         }
     }
 
@@ -125,10 +129,20 @@ impl Mount {
         self
     }
 
-    /// A local embedder: `confirm-spam` sources it with the text as `in` and keeps its
-    /// answer with the example. Never a hosted model.
+    /// A local embedder of the `urn:llm:embed` contract (usually that IRI): `confirm-spam`
+    /// sources it with the raw text and the mount's [embed model](Mount::embed_model), and
+    /// keeps the vector, the model and its digest with the example, which is what lets the
+    /// holding stage compare with it. Never a hosted model.
     pub fn embedder(mut self, iri: Iri) -> Self {
         self.embedder = Some(iri);
+        self
+    }
+
+    /// The model the embedder is asked for: `embeddinggemma` unless set. Give it the holding
+    /// stage's [`Policy::embed_model`](crate::Policy::embed_model), since the stage compares
+    /// only vectors the same model made.
+    pub fn embed_model(mut self, model: impl Into<String>) -> Self {
+        self.embed_model = model.into();
         self
     }
 

@@ -1,6 +1,10 @@
 # What may be in the examples channel: spam a person confirmed, which the holding stage
-# compares a borderline inquiry with. inq:embedding is what the mount's local embedder
-# answered for the text, when it has one; the holding stage embeds an example without one.
+# compares a borderline inquiry with. Read into memory only: there is no index beside it.
+#
+# inq:embedding is base64 of little-endian f32s, made by the model inq:embeddingModel names at
+# the digest inq:embeddingDigest names: the layers client writes all three when its mount has
+# an embedder, and none when it has not. The holding stage compares a vector only with one the
+# same model and digest made, so an example without the three is kept but never compared.
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -9,19 +13,27 @@
 @prefix ik: <https://ikigai-rs.dev/ns#> .
 @prefix inq: <https://ikigai-rs.dev/ns/inquiry#> .
 
-<urn:iki:inquiry:shape:example> a sh:NodeShape ;
-  sh:targetClass inq:Example ;
+<urn:iki:inquiry:shape:spam-example> a sh:NodeShape ;
+  sh:targetClass inq:SpamExample ;
   sh:closed true ;
   sh:ignoredProperties ( rdf:type ) ;
   sh:property
+    # The inquiry it came from.
     [ sh:path inq:inquiry ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:pattern "^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$" ] ,
     [ sh:path inq:site ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:minLength 1 ; sh:maxLength 253 ] ,
     [ sh:path inq:text ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:maxLength 10000 ] ,
+    # The edge's keyed hash of the sender, never the address itself.
     [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 128 ] ,
     [ sh:path inq:embedding ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 262144 ] ,
+    [ sh:path inq:embeddingModel ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:minLength 1 ; sh:maxLength 256 ] ,
+    [ sh:path inq:embeddingDigest ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:minLength 1 ; sh:maxLength 128 ] ,
+    # A person's word for the kind of spam, if they gave one.
+    [ sh:path inq:label ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 64 ] ,
     [ sh:path prov:wasAttributedTo ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ,
     [ sh:path dcterms:created ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ,
     [ sh:path ik:seq ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] .
