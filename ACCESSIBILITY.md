@@ -6,7 +6,7 @@ conformance claim. Adapted from the
 
 | Field | Value |
 |---|---|
-| Target | WCAG 2.2 Level AA, for any page that presents this repository's output: the layers client's two views and its action messages, and the holding stage's answer |
+| Target | WCAG 2.2 Level AA, for any page that presents this repository's output: the layers client's two views and its action messages, the holding stage's answer, and the edge's plain-text answers |
 | Status | Evaluation in progress. No conformance claim. |
 | Owner | the maintainers of this repository |
 | Report a barrier | [a GitHub issue](https://github.com/ikigai-rs/ikigai-inquiry/issues/new?labels=accessibility) with the `accessibility` label; anything security-sensitive through [private vulnerability reporting](https://github.com/ikigai-rs/ikigai-inquiry/security/advisories/new) |
@@ -14,8 +14,8 @@ conformance claim. Adapted from the
 
 ## What it emits that people read
 
-Two parts: the layers client (`src/view.rs`, `src/action.rs`) and the holding stage
-(`src/holding.rs`). The edge is not built yet and emits nothing.
+Three parts: the layers client (`src/view.rs`, `src/action.rs`), the holding stage
+(`src/holding.rs`) and the edge half (`src/endpoints.rs`).
 
 ### The layers client
 
@@ -88,6 +88,31 @@ no page.
 - **Tested** by `tests/holding.rs`, which reads the answers' words (and that the text is never
   in them). It has not been tried with a screen reader; it is plain text with no layout.
 
+### The edge's answers
+
+No pages. The edge half's doors answer short plain-text lines (`text/plain; charset=utf-8`),
+which a person reads in a terminal or a client shows; each also answers the same as JSON
+(`as=application/json`) for programs, and a client builds its own page from that.
+
+| Door | Text answer |
+|---|---|
+| `urn:iki:inquiry:route` | `<class> <layer> <tuple>` (e.g. `ham inquiry-brian urn:layer:inquiry-brian:inquiry:…`), or `blocked` |
+| `urn:iki:inquiry:sender-key` | the key, 64 hex digits |
+| `urn:iki:inquiry:block:key:{key}` | Exists: `blocked`; Source: `key`, `scope`, `label`, `created`, `expires` lines; Delete: `lifted <key>` or `no block on <key>` |
+| `urn:iki:inquiry:apply` | one line per intent it took: `trained <ham or spam> (<added, moved or unchanged>) <inquiry>`, `untrained <inquiry>`, `blocked <scope> <key> until <time>`, `lifted <key>`, `no block on <key>`, or `skipped <intent> <inquiry>: <why>`; `no intents pending` when there were none |
+| `urn:iki:inquiry:count:date:{date}` | `date <date>`, then `site <site> blocked <n>` and `site <site> layer <layer> <n>` lines |
+| `urn:iki:inquiry:count:confusion:date:{date}` | `date <date>`, then `<class> <label> <n>` lines |
+| any door | a refusal: the kernel's error kind and one English sentence naming the argument and what it accepts (e.g. `a site is 1 to 64 lowercase letters, …`) |
+
+The rules they follow: meaning is in words, never in color, layout or a symbol alone; each line
+starts with the word that says what it is; times are ISO 8601 in UTC
+(`2026-12-14T18:23:56.789Z`), dates `YYYY-MM-DD`; no line depends on the one before it to be
+understood. Tested: `tests/edge.rs` asserts the exact text of the answers above.
+
+Not yet known: how the answers read through a screen reader (not tested with one); they are
+English only; a 64-digit key is long to listen to, and a client should offer to copy it rather
+than read it out.
+
 This file grows with the code: each change that adds output people read adds it here, with the
 rules it follows, how it is tested, and what is not yet known.
 
@@ -113,3 +138,4 @@ technology, if you are comfortable sharing them. Anything security-sensitive goe
 | 2026-11-14 | First version. |
 | 2026-11-14 | The layers client: the pending and spam views, and the action messages. |
 | 2026-11-14 | The holding stage's text answer. |
+| 2026-11-14 | The edge half's text answers. |

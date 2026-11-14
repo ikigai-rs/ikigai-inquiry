@@ -16,8 +16,26 @@ Every action is a resource too (not spam, confirm as spam, block the sender, res
 views and actions are a client any host can mount. Senders are blocked by a keyed hash of
 their address, never the address itself, and nothing tracks an individual.
 
-**Status:** the layers client and the holding stage are built; the edge is not. The design is
+**Status:** the edge half, the holding stage and the layers client are built. The design is
 ledger #3680; nothing is published yet.
+
+## The edge half
+
+What runs where a form posts. A host opens an `Edge` over its 32-byte sender-key file, a store
+and a `Config` over one owner's `Layers`, and mounts `ikigai_inquiry::edge_space`:
+
+| resource | verb | what it does |
+|---|---|---|
+| `urn:iki:inquiry:route` | Sink | scores an inquiry at `urn:bayes:{model}:score` and drops ONE `inq:Inquiry` tuple into the layer the policy picks (ham → inquiry, unsure → holding, spam → spam) |
+| `urn:iki:inquiry:sender-key` | Source | the keyed BLAKE3 key of an `address=` or a `domain=` |
+| `urn:iki:inquiry:block:key:{key}` | Exists / Source / Delete | the door's check (`NotFound` once expired), the block's record, lifting it |
+| `urn:iki:inquiry:apply` | Sink | the airlock's handler: takes the intents the client wrote and trains, untrains, blocks or unblocks |
+| `urn:iki:inquiry:count:date:{date}` | Source | per site: inquiries routed to each layer, blocked drops |
+| `urn:iki:inquiry:count:confusion:date:{date}` | Source | score class × a person's label |
+
+Each door declares its own capability (`urn:cap:inquiry:*`); the crate docs list them, the
+tuple's properties and what the router does when the classifier cannot answer. The tuple is in
+the terms the shipped inquiry shapes admit, so the client reads and moves what the edge wrote.
 
 ## The holding stage
 
@@ -63,10 +81,11 @@ and the examples channel. The tests open a real `ikigai-layers` host on exactly 
 
 ## Accessibility
 
-The layers client's two views and its action messages, and the holding stage's plain-text
-answer, are what this crate emits for people to read. [ACCESSIBILITY.md](ACCESSIBILITY.md)
-says which rules they follow, how they are tested and what is not yet known, and how to report
-a barrier: an issue carrying the `accessibility` label.
+The layers client's two views and its action messages, the holding stage's plain-text answer
+and the edge's short plain-text answers are what this crate emits for people to read.
+[ACCESSIBILITY.md](ACCESSIBILITY.md) says which rules they follow, how they are tested and
+what is not yet known, and how to report a barrier: an issue carrying the `accessibility`
+label.
 
 ## License
 

@@ -4,11 +4,13 @@
 # it there from the tuple numbered {seq}. The site is a field, so one set of layers serves
 # every site of one owner.
 #
-# inq:text and inq:replyTo are a stranger's words: data, never instructions. The layer host
+# inq:text, inq:replyTo, inq:name and inq:organization are a stranger's words: data, never
+# instructions. The layer host
 # seals every tuple at rest; nothing here is stored in the clear.
 #
-# The judgment properties (inq:verdict, inq:example, inq:score, inq:unjudged) are what the
-# holding stage records when it sends an inquiry on. The last three properties are the host's
+# inq:class and inq:classScore are the edge's judgment: the classifier's class and score, which
+# every copy keeps. The judgment properties (inq:verdict, inq:example, inq:score,
+# inq:unjudged) are what the holding stage records when it sends an inquiry on. The last three properties are the host's
 # STAMPS (who, when, where in the feed).
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -32,8 +34,15 @@
     # The address a reply goes to, as the visitor typed it; a client checks it before it
     # makes a link of it.
     [ sh:path inq:replyTo ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 254 ] ,
+    # The name and organization the visitor gave, if any.
+    [ sh:path inq:name ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 256 ] ,
+    [ sh:path inq:organization ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 256 ] ,
     # The edge's keyed hash of the sender, never the address itself.
     [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 128 ] ,
+    # The edge's classifier: its class (unscored when it could not answer) and its score.
+    [ sh:path inq:class ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:in ( "ham" "unsure" "spam" "unscored" ) ] ,
+    [ sh:path inq:classScore ; sh:maxCount 1 ; sh:datatype xsd:double ] ,
     # What sent it to this layer: a short word the edge, the holding stage or a client writes
     # (score, blocked, example, model, abstained, unjudged, shadow, not-spam, flagged).
     [ sh:path inq:reason ; sh:maxCount 1 ; sh:datatype xsd:string ;
