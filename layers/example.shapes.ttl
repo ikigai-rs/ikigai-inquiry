@@ -1,0 +1,27 @@
+# What may be in the examples channel: spam a person confirmed, which the holding stage
+# compares a borderline inquiry with. inq:embedding is what the mount's local embedder
+# answered for the text, when it has one; the holding stage embeds an example without one.
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix ik: <https://ikigai-rs.dev/ns#> .
+@prefix inq: <https://ikigai-rs.dev/ns/inquiry#> .
+
+<urn:iki:inquiry:shape:example> a sh:NodeShape ;
+  sh:targetClass inq:Example ;
+  sh:closed true ;
+  sh:ignoredProperties ( rdf:type ) ;
+  sh:property
+    [ sh:path inq:inquiry ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:pattern "^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$" ] ,
+    [ sh:path inq:site ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:minLength 1 ; sh:maxLength 253 ] ,
+    [ sh:path inq:text ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:maxLength 10000 ] ,
+    [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 128 ] ,
+    [ sh:path inq:embedding ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 262144 ] ,
+    [ sh:path prov:wasAttributedTo ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ,
+    [ sh:path dcterms:created ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ,
+    [ sh:path ik:seq ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] .
