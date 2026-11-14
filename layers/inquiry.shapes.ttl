@@ -1,0 +1,42 @@
+# What may be in an inquiry, spam or holding layer: one inquiry from a public contact form.
+# Each copy is named urn:layer:{layer}:inquiry:{id}, or urn:layer:{layer}:inquiry:{id}:m{seq}
+# when a client action moved it there from the tuple numbered {seq}. The site is a field, so
+# one set of layers serves every site of one owner.
+#
+# inq:text and inq:replyTo are a stranger's words: data, never instructions. The layer host
+# seals every tuple at rest; nothing here is stored in the clear.
+#
+# The last three properties are the host's STAMPS (who, when, where in the feed).
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix ik: <https://ikigai-rs.dev/ns#> .
+@prefix inq: <https://ikigai-rs.dev/ns/inquiry#> .
+
+<urn:iki:inquiry:shape:inquiry> a sh:NodeShape ;
+  sh:targetClass inq:Inquiry ;
+  sh:closed true ;
+  sh:ignoredProperties ( rdf:type ) ;
+  sh:property
+    [ sh:path inq:inquiry ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:pattern "^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$" ] ,
+    [ sh:path inq:site ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:minLength 1 ; sh:maxLength 253 ] ,
+    [ sh:path inq:text ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:maxLength 10000 ] ,
+    # The address a reply goes to, as the visitor typed it; a client checks it before it
+    # makes a link of it.
+    [ sh:path inq:replyTo ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 254 ] ,
+    # The edge's keyed hash of the sender, never the address itself.
+    [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 128 ] ,
+    # What sent it to this layer: a short word the edge or a client writes (score, blocked,
+    # example, model, not-spam, flagged).
+    [ sh:path inq:reason ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:pattern "^[a-z][a-z0-9-]{0,31}$" ] ,
+    # When the edge received it; every copy keeps it, so "newest first" survives a move.
+    [ sh:path inq:received ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ,
+    [ sh:path prov:wasAttributedTo ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ,
+    [ sh:path dcterms:created ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ,
+    [ sh:path ik:seq ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] .

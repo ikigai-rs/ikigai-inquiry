@@ -1,0 +1,22 @@
+{ "@context": {
+  "inq": "https://ikigai-rs.dev/ns/inquiry#",
+  "ik": "https://ikigai-rs.dev/ns#",
+  "dcterms": "http://purl.org/dc/terms/",
+  "prov": "http://www.w3.org/ns/prov#",
+  "xsd": "http://www.w3.org/2001/XMLSchema#",
+  "Inquiry": "inq:Inquiry",
+  "Example": "inq:Example",
+  "Intent": "inq:Intent",
+  "inquiry": "inq:inquiry",
+  "site": "inq:site",
+  "text": "inq:text",
+  "replyTo": "inq:replyTo",
+  "sender": "inq:sender",
+  "reason": "inq:reason",
+  "received": { "@id": "inq:received", "@type": "xsd:dateTime" },
+  "intent": "inq:intent",
+  "embedding": "inq:embedding",
+  "attributedTo": { "@id": "prov:wasAttributedTo", "@type": "@id" },
+  "created": { "@id": "dcterms:created", "@type": "xsd:dateTime" },
+  "seq": { "@id": "ik:seq", "@type": "xsd:integer" }
+} }

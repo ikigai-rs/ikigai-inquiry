@@ -12,5 +12,19 @@ categories = ["wasm", "text-processing"]
 
 [dependencies]
 # The released kernel, consumed from crates.io, so a host links exactly one `ikigai-core`.
-# Nothing is used yet; 0.3.0 is the line the hosts run. ⚠ `"0.3.0"` is also a ceiling below 0.4.0.
+# 0.3.0 is the line the hosts run. ⚠ `"0.3.0"` is also a ceiling below 0.4.0.
 ikigai-core = "0.3.0"
+# `compose` and `each` fill the views, so visitor text reaches a page only through `$h{…}`;
+# `html` is the escaping and link rules the views' Rust side shares with them.
+ikigai-fn = "0.11.0"
+async-trait = "0.1"
+serde_json = "1.0"
+
+[dev-dependencies]
+futures = "0.3"
+# The client's tests run against a real layer host: the shipped shapes and context are
+# what it opens, so a tuple the client writes is one the layers actually admit.
+ikigai-layers = "0.10.1"
+age = { version = "0.11.1", default-features = false }
+# The views are well-formed, so a test reads their structure as XML.
+roxmltree = "0.20"
