@@ -1,6 +1,6 @@
 # What may be in an inquiry, spam or holding layer: one inquiry from a public contact form.
-# Each copy is named urn:layer:{layer}:inquiry:{id} (by the edge, and by the holding stage
-# when it sends one on), or urn:layer:{layer}:inquiry:{id}:m{seq} when a client action moved
+# Each copy is named urn:layer:{layer}:inquiry:id:{id} (by the edge, and by the holding stage
+# when it sends one on), or urn:layer:{layer}:inquiry:id:{id}:move:{seq} when a client action moved
 # it there from the tuple numbered {seq}. The site is a field, so one set of layers serves
 # every site of one owner.
 #
@@ -20,7 +20,7 @@
 @prefix ik: <https://ikigai-rs.dev/ns#> .
 @prefix inq: <https://ikigai-rs.dev/ns/inquiry#> .
 
-<urn:iki:inquiry:shape:inquiry> a sh:NodeShape ;
+<urn:iki:inquiry:shape:name:inquiry> a sh:NodeShape ;
   sh:targetClass inq:Inquiry ;
   sh:closed true ;
   sh:ignoredProperties ( rdf:type ) ;

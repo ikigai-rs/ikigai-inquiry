@@ -21,9 +21,24 @@ Three parts: the layers client (`src/view.rs`, `src/action.rs`), the holding sta
 
 | Output | Where | What a person reads |
 |---|---|---|
-| The pending inquiries | `urn:iki:inquiry:view:pending`, a whole HTML page | a count, then a section per site, each inquiry newest first: an excerpt as its heading, when it arrived, the reply address, the full message behind a disclosure, a reply link, and buttons |
-| The day's spam | `urn:iki:inquiry:view:spam`, a whole HTML page | a count, two tables (arrivals by site, by what sent them to spam), then each arrival: an excerpt as its heading, site, reason, time, and buttons |
-| An action's answer | `urn:iki:inquiry:action:{action}`, one line of `text/plain` | what was done, for example "Moved inquiry a1 from spam to your inquiries." A refusal is the kernel's typed error. |
+| The pending inquiries | `urn:iki:inquiry:view:name:pending`, a whole HTML page | a count, then a section per site, each inquiry newest first: an excerpt as its heading, when it arrived, the reply address, the full message behind a disclosure, a reply link, and buttons |
+| The day's spam | `urn:iki:inquiry:view:name:spam`, a whole HTML page | a count, two tables (arrivals by site, by what sent them to spam), then each arrival: an excerpt as its heading, site, reason, time, and buttons |
+| An action's answer | `urn:iki:inquiry:action:name:{action}`, one line of `text/plain` | what was done, for example "Moved inquiry a1 from spam to your inquiries." A refusal is the kernel's typed error. |
+
+Buttons post by default to `/inquiry/action/name/{action}`. The templates and rendered
+parts share `urn:iki:inquiry:template:name:{name}`; their data comes from
+`urn:iki:inquiry:data:pending:site:{key}` (a hex-encoded site) and
+`urn:iki:inquiry:data:spam:date:{day}:part:{part}` (`site`, `reason`, `item`).
+An invalid spam part names these three choices in its error sentence.
+
+Layer names in answers are `inquiry-{owner}`, `inquiry-spam-{owner}`,
+`inquiry-hold-{owner}`, `inquiry-example-{owner}` and `inquiry-intent-{owner}`.
+Owners of 9–12 characters use the shorter shared prefix `inq-` so every name fits the
+host's 24-character limit. Invalid owners are refused with words describing the accepted
+length and characters; longer identities need explicit layer names. Inquiry subjects in
+answers use `urn:layer:{layer}:inquiry:id:{id}` and moved copies add `:move:{seq}`.
+`tests/naming.rs` checks the names and owner length limits; `tests/views.rs` checks the
+keyed data resources, named templates, form targets and removal of old aliases.
 
 #### The rules the views follow
 
@@ -78,7 +93,7 @@ no page.
 - **What it says.** One line per tuple the pass handled, then one closing sentence of counts:
   how many inquiries were sent on, finished from the worker's receipts, left for a later pass,
   taken first by another worker, and taken but not yet sent on. A line names the tuple's
-  subject, the layer it went to and why, in words (`sent to spam-b (confirmed example <…>,
+  subject, the layer it went to and why, in words (`sent to inquiry-spam-b (confirmed example <…>,
   score 0.994)`, `unjudged, the local model failed`), never by a symbol, color or position
   alone. Counts agree in number (`1 inquiry`, `2 inquiries`).
 - **What it never says.** An inquiry's text, or anything else a visitor wrote. An answer is
@@ -96,12 +111,12 @@ which a person reads in a terminal or a client shows; each also answers the same
 
 | Door | Text answer |
 |---|---|
-| `urn:iki:inquiry:route` | `<class> <layer> <tuple>` (e.g. `ham inquiry-brian urn:layer:inquiry-brian:inquiry:…`), or `blocked` |
+| `urn:iki:inquiry:route` | `<class> <layer> <tuple>` (e.g. `ham inquiry-brian urn:layer:inquiry-brian:inquiry:id:…`), or `blocked` |
 | `urn:iki:inquiry:sender-key` | the key, 64 hex digits |
 | `urn:iki:inquiry:block:key:{key}` | Exists: `blocked`; Source: `key`, `scope`, `label`, `created`, `expires` lines; Delete: `lifted <key>` or `no block on <key>` |
 | `urn:iki:inquiry:apply` | one line per intent it took: `trained <ham or spam> (<added, moved or unchanged>) <inquiry>`, `untrained <inquiry>`, `blocked <scope> <key> until <time>`, `lifted <key>`, `no block on <key>`, or `skipped <intent> <inquiry>: <why>`; `no intents pending` when there were none |
 | `urn:iki:inquiry:count:date:{date}` | `date <date>`, then `site <site> blocked <n>` and `site <site> layer <layer> <n>` lines |
-| `urn:iki:inquiry:count:confusion:date:{date}` | `date <date>`, then `<class> <label> <n>` lines |
+| `urn:iki:inquiry:count:kind:confusion:date:{date}` | `date <date>`, then `<class> <label> <n>` lines |
 | any door | a refusal: the kernel's error kind and one English sentence naming the argument and what it accepts (e.g. `a site is 1 to 64 lowercase letters, …`) |
 
 The rules they follow: meaning is in words, never in color, layout or a symbol alone; each line
@@ -139,3 +154,4 @@ technology, if you are comfortable sharing them. Anything security-sensitive goe
 | 2026-11-14 | The layers client: the pending and spam views, and the action messages. |
 | 2026-11-14 | The holding stage's text answer. |
 | 2026-11-14 | The edge half's text answers. |
+| 2026-11-14 | Singular, type-first layer and resource names with named keys. |

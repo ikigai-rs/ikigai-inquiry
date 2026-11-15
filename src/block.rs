@@ -14,7 +14,7 @@ use crate::key::{Key, Scope};
 use crate::store::Store;
 
 /// The document the block set is kept in.
-const DOCUMENT: &str = "blocks";
+const DOCUMENT: &str = "block";
 
 /// The most blocks the set holds at once. Past it a new block is refused until one is lifted
 /// or expires.

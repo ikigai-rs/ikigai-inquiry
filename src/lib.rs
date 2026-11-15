@@ -26,7 +26,7 @@
 //! | `urn:iki:inquiry:block:key:{key}` | Delete | lifts the block | `urn:cap:inquiry:block:lift` |
 //! | `urn:iki:inquiry:apply` | Sink | the airlock's handler: applies, then takes, the pending intents | `urn:cap:inquiry:apply` |
 //! | `urn:iki:inquiry:count:date:{date}` | Source | per site: inquiries routed to each layer, and blocked drops | `urn:cap:inquiry:count:read` |
-//! | `urn:iki:inquiry:count:confusion:date:{date}` | Source | score class × a person's label | `urn:cap:inquiry:count:read` |
+//! | `urn:iki:inquiry:count:kind:confusion:date:{date}` | Source | score class × a person's label | `urn:cap:inquiry:count:read` |
 //!
 //! The router scores the inquiry through the kernel at `urn:bayes:{model}:score` (an
 //! `ikigai-bayes` model the host mounts) and maps its class through the [`RoutePolicy`]: `ham` to
@@ -90,9 +90,9 @@
 //!
 //! | resource | verb | what it is |
 //! | --- | --- | --- |
-//! | `urn:iki:inquiry:view:pending` | Source | the pending inquiries, by site, newest first (HTML) |
-//! | `urn:iki:inquiry:view:spam` | Source | one day's spam, `day=YYYY-MM-DD` or today (HTML) |
-//! | `urn:iki:inquiry:action:{action}` | Sink | one [`Action`] on `inquiry=<id>` (text) |
+//! | `urn:iki:inquiry:view:name:pending` | Source | the pending inquiries, by site, newest first (HTML) |
+//! | `urn:iki:inquiry:view:name:spam` | Source | one day's spam, `day=YYYY-MM-DD` or today (HTML) |
+//! | `urn:iki:inquiry:action:name:{action}` | Sink | one [`Action`] on `inquiry=<id>` (text) |
 //!
 //! Every request runs under the caller's own grant: the client holds no authority of its
 //! own, so what a person can do through it is what their layer grants allow. A person who
@@ -151,9 +151,9 @@ pub use store::DirStore;
 pub use store::{MemoryStore, Store};
 
 /// The pending inquiries view.
-pub const PENDING_VIEW: &str = "urn:iki:inquiry:view:pending";
+pub const PENDING_VIEW: &str = "urn:iki:inquiry:view:name:pending";
 /// The day's spam view.
-pub const SPAM_VIEW: &str = "urn:iki:inquiry:view:spam";
+pub const SPAM_VIEW: &str = "urn:iki:inquiry:view:name:spam";
 
 /// The layers client for one mount: its views, its actions, and the templates and data
 /// they are filled from.
@@ -179,7 +179,7 @@ pub fn space(mount: Mount) -> EndpointSpace {
                     .named("inquiry-pending-section"),
             )
             .bind(
-                template("urn:iki:inquiry:data:pending:{key}"),
+                template("urn:iki:inquiry:data:pending:site:{key}"),
                 view::PendingData(mount.clone()),
             );
     }
@@ -191,7 +191,7 @@ pub fn space(mount: Mount) -> EndpointSpace {
                 ikigai_fn::compose_over(named(view::SPAM_BODY_TEMPLATE)).named("inquiry-spam-body"),
             )
             .bind(
-                template("urn:iki:inquiry:data:spam:{day}:{part}"),
+                template("urn:iki:inquiry:data:spam:date:{day}:part:{part}"),
                 view::SpamData(mount.clone()),
             );
     }

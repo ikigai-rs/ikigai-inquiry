@@ -4,7 +4,7 @@
 # the inquiry, and its sender's keyed hash when the client saw it, for the edge's block set;
 # block-domain and unblock-domain name an inquiry whose sender's domain the edge keys. A block
 # may carry a person's note, which becomes the block's label.
-# Named urn:layer:{layer}:intent:{intent}:{id}:{suffix}.
+# Named urn:layer:{layer}:intent:name:{intent}:inquiry:{id}:occurrence:{suffix}.
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -13,7 +13,7 @@
 @prefix ik: <https://ikigai-rs.dev/ns#> .
 @prefix inq: <https://ikigai-rs.dev/ns/inquiry#> .
 
-<urn:iki:inquiry:shape:intent> a sh:NodeShape ;
+<urn:iki:inquiry:shape:name:intent> a sh:NodeShape ;
   sh:targetClass inq:Intent ;
   sh:closed true ;
   sh:ignoredProperties ( rdf:type ) ;

@@ -9,7 +9,7 @@
 //! 3. **Take** each older tuple BY ITS SUBJECT. A second taker is answered `Conflict` naming
 //!    the first: this worker moves on.
 //! 4. **Judge** it ([`crate::funnel`]) and **out** the result into the spam or the inquiry
-//!    layer, as `urn:layer:{layer}:inquiry:{id}`. Take first, then out: a tuple is never in
+//!    layer, as `urn:layer:{layer}:inquiry:id:{id}`. Take first, then out: a tuple is never in
 //!    two places, and one whose out was lost is in this worker's receipts, which step 1 reads.
 //!
 //! The out's subject is the inquiry's id under the destination layer, so finishing a lost out

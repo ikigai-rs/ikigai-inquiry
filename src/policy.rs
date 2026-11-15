@@ -46,28 +46,18 @@ pub struct Policy {
 }
 
 impl Policy {
-    /// The layers of owner `owner` (`holding-{owner}`, `spam-{owner}`, `inquiry-{owner}`,
-    /// `examples-{owner}`), the classifier `inquiry-{owner}`, and the design's defaults.
+    /// The layers of owner `owner` (`inquiry-hold-{owner}`, `inquiry-spam-{owner}`, `inquiry-{owner}`,
+    /// `inquiry-example-{owner}`), the classifier `inquiry-{owner}`, and the design's defaults.
     /// Refused when `owner` would not make a layer name: lowercase ASCII letters, digits and
-    /// `-`, starting with a letter or digit.
+    /// `-`, starting with a letter or digit, at most 12 characters. Layer names use the
+    /// same shared prefix and length checks as [`crate::Layers::for_owner`].
     pub fn for_owner(owner: &str) -> Result<Policy, String> {
-        let valid = !owner.is_empty()
-            && owner.len() <= 48
-            && owner
-                .chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-            && !owner.starts_with('-');
-        if !valid {
-            return Err(format!(
-                "`{owner}` is not an owner name: use lowercase letters, digits and `-`, \
-                 starting with a letter or digit, at most 48 characters"
-            ));
-        }
+        let layers = crate::Layers::for_owner(owner).map_err(|error| error.to_string())?;
         Ok(Policy {
-            holding: format!("holding-{owner}"),
-            spam: format!("spam-{owner}"),
-            inquiry: format!("inquiry-{owner}"),
-            examples: format!("examples-{owner}"),
+            holding: layers.holding,
+            spam: layers.spam,
+            inquiry: layers.inquiry,
+            examples: layers.examples,
             embed_model: DEFAULT_EMBED_MODEL.into(),
             threshold: DEFAULT_THRESHOLD,
             classifier: format!("inquiry-{owner}"),
@@ -93,7 +83,12 @@ mod tests {
         let p = Policy::for_owner("b").unwrap();
         assert_eq!(
             (&*p.holding, &*p.spam, &*p.inquiry, &*p.examples),
-            ("holding-b", "spam-b", "inquiry-b", "examples-b")
+            (
+                "inquiry-hold-b",
+                "inquiry-spam-b",
+                "inquiry-b",
+                "inquiry-example-b"
+            )
         );
         assert_eq!(p.embed_model, "embeddinggemma");
         assert_eq!(p.threshold, 0.85);

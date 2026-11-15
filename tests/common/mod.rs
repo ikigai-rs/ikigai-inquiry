@@ -39,14 +39,14 @@ impl Drop for Fixture {
 /// The grants a person holds to use every view and action.
 pub fn person_scopes() -> Vec<String> {
     let mut scopes = Vec::new();
-    for layer in ["inquiry-b", "spam-b"] {
+    for layer in ["inquiry-b", "inquiry-spam-b"] {
         for verb in ["read", "out", "take"] {
             scopes.push(format!("urn:cap:layer:{verb}:{layer}"));
         }
     }
-    scopes.push("urn:cap:layer:read:holding-b".into());
-    scopes.push("urn:cap:layer:say:examples-b".into());
-    scopes.push("urn:cap:layer:out:intents-b".into());
+    scopes.push("urn:cap:layer:read:inquiry-hold-b".into());
+    scopes.push("urn:cap:layer:say:inquiry-example-b".into());
+    scopes.push("urn:cap:layer:out:inquiry-intent-b".into());
     scopes.push("urn:cap:test:embed".into());
     scopes
 }
@@ -59,7 +59,7 @@ pub fn person(principal: &str) -> Capability {
 
 pub fn edge() -> Capability {
     Capability::scoped(
-        ["inquiry-b", "spam-b", "holding-b"].map(|l| format!("urn:cap:layer:out:{l}")),
+        ["inquiry-b", "inquiry-spam-b", "inquiry-hold-b"].map(|l| format!("urn:cap:layer:out:{l}")),
     )
     .with_principal(EDGE)
     .unwrap()
@@ -70,10 +70,10 @@ pub fn auditor() -> Capability {
     Capability::scoped(
         [
             "inquiry-b",
-            "spam-b",
-            "holding-b",
-            "examples-b",
-            "intents-b",
+            "inquiry-spam-b",
+            "inquiry-hold-b",
+            "inquiry-example-b",
+            "inquiry-intent-b",
         ]
         .map(|l| format!("urn:cap:layer:read:{l}")),
     )
@@ -105,7 +105,7 @@ pub fn fixture_with(
     write(&config, "layers/inquiry.shapes.ttl", vocab::INQUIRY_SHAPES);
     write(&config, "layers/example.shapes.ttl", vocab::EXAMPLE_SHAPES);
     write(&config, "layers/intent.shapes.ttl", vocab::INTENT_SHAPES);
-    for layer in ["inquiry-b", "spam-b", "holding-b"] {
+    for layer in ["inquiry-b", "inquiry-spam-b", "inquiry-hold-b"] {
         write(
             &config,
             &format!("layers/{layer}.toml"),
@@ -115,12 +115,12 @@ pub fn fixture_with(
     }
     write(
         &config,
-        "layers/intents-b.toml",
+        "layers/inquiry-intent-b.toml",
         "model = \"tuplespace\"\nshapes = \"intent.shapes.ttl\"\ncontext = \"inquiry.context.jsonld\"\n",
     );
     write(
         &config,
-        "layers/examples-b.toml",
+        "layers/inquiry-example-b.toml",
         "model = \"channel\"\nshapes = \"example.shapes.ttl\"\ncontext = \"inquiry.context.jsonld\"\n",
     );
     write(
@@ -137,8 +137,8 @@ pub fn fixture_with(
     let mut manifest = String::new();
     for (layer, person) in [
         ("inquiry-b", "[\"read\", \"out\", \"take\"]"),
-        ("spam-b", "[\"read\", \"out\", \"take\"]"),
-        ("holding-b", "[\"read\"]"),
+        ("inquiry-spam-b", "[\"read\", \"out\", \"take\"]"),
+        ("inquiry-hold-b", "[\"read\"]"),
     ] {
         manifest.push_str(&format!(
             "[[mount]]\nlayer = \"{layer}\"\nbrian = {person}\nchris = {person}\n\
@@ -146,8 +146,8 @@ pub fn fixture_with(
         ));
     }
     manifest.push_str(
-        "[[mount]]\nlayer = \"examples-b\"\nbrian = [\"say\"]\nchris = [\"say\"]\n\
-         auditor = [\"read\"]\n\n[[mount]]\nlayer = \"intents-b\"\nbrian = [\"out\"]\n\
+        "[[mount]]\nlayer = \"inquiry-example-b\"\nbrian = [\"say\"]\nchris = [\"say\"]\n\
+         auditor = [\"read\"]\n\n[[mount]]\nlayer = \"inquiry-intent-b\"\nbrian = [\"out\"]\n\
          chris = [\"out\"]\nairlock = [\"read\", \"take\"]\nauditor = [\"read\"]\n",
     );
     write(&config, "collabs/b.toml", &manifest);
@@ -230,7 +230,7 @@ pub struct Arrival<'a> {
 
 pub fn arrive(f: &Fixture, layer: &str, a: Arrival<'_>) {
     let mut node = json!({
-        "@id": format!("urn:layer:{layer}:inquiry:{}", a.id),
+        "@id": format!("urn:layer:{layer}:inquiry:id:{}", a.id),
         "@type": format!("{INQ}Inquiry"),
         format!("{INQ}inquiry"): a.id,
         format!("{INQ}site"): a.site,
@@ -275,7 +275,7 @@ pub fn examples(f: &Fixture) -> Vec<Value> {
         &f.kernel,
         &auditor(),
         Verb::Source,
-        "urn:layer:examples-b:entries",
+        "urn:layer:inquiry-example-b:entries",
         &[("as", "application/ld+json")],
     )
     .unwrap();
@@ -288,7 +288,7 @@ pub fn act(f: &Fixture, cap: &Capability, action: &str, id: &str) -> Result<Stri
         &f.kernel,
         cap,
         Verb::Sink,
-        &format!("urn:iki:inquiry:action:{action}"),
+        &format!("urn:iki:inquiry:action:name:{action}"),
         &[("inquiry", id)],
     )
     .map(text)

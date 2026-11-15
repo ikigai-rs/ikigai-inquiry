@@ -13,7 +13,7 @@
 @prefix ik: <https://ikigai-rs.dev/ns#> .
 @prefix inq: <https://ikigai-rs.dev/ns/inquiry#> .
 
-<urn:iki:inquiry:shape:spam-example> a sh:NodeShape ;
+<urn:iki:inquiry:shape:name:spam-example> a sh:NodeShape ;
   sh:targetClass inq:SpamExample ;
   sh:closed true ;
   sh:ignoredProperties ( rdf:type ) ;
