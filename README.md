@@ -80,7 +80,9 @@ failure sends it to inquiry marked `unjudged`, never back. A shadow switch recor
 would do and sends everything to inquiry.
 
 The confirmed examples are the `inq:SpamExample` entries of the examples channel, which the
-layers client's `confirm-spam` writes. An example carries its embedding only when the mount
+layers client's `confirm-spam` writes. Examples retain the confirmed text, never the sender's
+address, name, or sender key; sender blocking belongs to the block set
+(`urn:iki:inquiry:block:key:{key}`). An example carries its embedding only when the mount
 has an embedder (`Mount::embedder`, the `urn:llm:embed` contract, with the stage's model), and
 the stage compares only examples the same model and digest embedded.
 

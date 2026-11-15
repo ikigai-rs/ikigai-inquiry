@@ -25,8 +25,6 @@
       sh:minLength 1 ; sh:maxLength 253 ] ,
     [ sh:path inq:text ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:maxLength 10000 ] ,
-    # The edge's keyed hash of the sender, never the address itself.
-    [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 128 ] ,
     [ sh:path inq:embedding ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 262144 ] ,
     [ sh:path inq:embeddingModel ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:minLength 1 ; sh:maxLength 256 ] ,
