@@ -132,6 +132,7 @@ fn confirm_spam_keeps_an_embedded_example() {
         m.embedder(ikigai_core::Iri::parse(EMBEDDER).unwrap())
     });
     arrive(&f, "inquiry-spam-b", arrival("s1", "b.example", "Buy now"));
+    assert_eq!(pending(&f, "inquiry-spam-b")[0]["sender"], "hash-of-s1");
     let said = act(&f, &person(BRIAN), "confirm-spam", "s1").unwrap();
     assert_eq!(
         said,
@@ -144,6 +145,7 @@ fn confirm_spam_keeps_an_embedded_example() {
     assert_eq!(examples[0]["inquiry"], "s1");
     assert_eq!(examples[0]["site"], "b.example");
     assert_eq!(examples[0]["text"], "Buy now");
+    assert!(examples[0].get("sender").is_none());
     // What the holding stage compares with: base64 little-endian f32s, the model, the digest.
     let vector = ikigai_inquiry::example::decode(examples[0]["embedding"].as_str().unwrap());
     assert_eq!(vector, Some(vec![7.0, 1.0]));
@@ -163,7 +165,7 @@ fn confirm_spam_without_an_embedder_keeps_the_text() {
     act(&f, &person(BRIAN), "confirm-spam", "s1").unwrap();
     let examples = examples(&f);
     assert_eq!(examples.len(), 1);
-    for term in ["embedding", "embeddingModel", "embeddingDigest"] {
+    for term in ["sender", "embedding", "embeddingModel", "embeddingDigest"] {
         assert!(examples[0].get(term).is_none(), "{term}");
     }
 }
@@ -281,4 +283,39 @@ fn every_action_is_a_sink() {
         "{sourced:?}"
     );
     assert_eq!(ids(&pending(&f, "inquiry-spam-b")), ["s1"]);
+}
+
+#[test]
+fn example_layer_refuses_sender_keys() {
+    let f = fixture("example-sender", |m| m);
+    let mut node = serde_json::json!({
+        "@id": "urn:layer:new",
+        "@type": format!("{INQ}SpamExample"),
+        format!("{INQ}inquiry"): "s1",
+        format!("{INQ}site"): "b.example",
+        format!("{INQ}text"): "Synthetic spam example",
+        format!("{INQ}sender"): "hash-of-s1",
+    });
+    let result = issue(
+        &f.kernel,
+        &person(BRIAN),
+        Verb::Sink,
+        "urn:layer:inquiry-example-b:say",
+        &[("content", &node.to_string())],
+    );
+    assert!(result.is_err(), "the example layer admitted a sender key");
+    assert!(examples(&f).is_empty());
+    // The same entry is valid once the sender key is removed.
+    node.as_object_mut()
+        .unwrap()
+        .remove(&format!("{INQ}sender"));
+    issue(
+        &f.kernel,
+        &person(BRIAN),
+        Verb::Sink,
+        "urn:layer:inquiry-example-b:say",
+        &[("content", &node.to_string())],
+    )
+    .unwrap();
+    assert_eq!(examples(&f).len(), 1);
 }

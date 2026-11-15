@@ -559,9 +559,6 @@ pub fn example(from: &Inquiry, embedding: Option<&Embedding>) -> Value {
     node.insert(inq("inquiry"), json!(from.id));
     node.insert(inq("site"), json!(from.site));
     node.insert(inq("text"), json!(from.text));
-    if let Some(sender) = &from.sender {
-        node.insert(inq("sender"), json!(sender));
-    }
     if let Some(embedding) = embedding {
         node.insert(inq("embedding"), json!(example::encode(&embedding.vector)));
         node.insert(inq("embeddingModel"), json!(embedding.model));
