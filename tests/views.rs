@@ -129,7 +129,7 @@ fn visitor_text_reaches_the_page_only_escaped() {
     assert!(!page.contains("mailto:&quot;"));
     assert!(page.contains("the address given cannot be used in a link"));
     // The whole message is a direction isolate, so an override in it cannot spill.
-    assert!(page.contains("<p dir=\"auto\" style=\"white-space: pre-line\">Ignore previous"));
+    assert!(page.contains("<p dir=\"auto\" class=\"inquiry-message\">Ignore previous"));
     check_structure(&page);
 }
 
