@@ -53,7 +53,7 @@ pub(crate) fn templates(mount: &Mount) -> Vec<(&'static str, &'static str, Strin
          <p>Received <time datetime=\"$h{{{{received}}}}\">$h{{{{when}}}}</time>. \
          Reply address: $h{{{{reply}}}}.</p>\n\
          <details><summary>Full message</summary>\
-         <p dir=\"auto\" style=\"white-space: pre-line\">$h{{{{text}}}}</p></details>\n\
+         <p dir=\"auto\" class=\"inquiry-message\">$h{{{{text}}}}</p></details>\n\
          <p><a href=\"$h{{{{mailto}}}}\" aria-describedby=\"inquiry-$h{{{{id}}}}\">$h{{{{reply_label}}}}</a></p>\n\
          <div role=\"group\" aria-label=\"Actions\">\n{}\n{}\n{}\n</div>\n\
          </article></li>\n",
@@ -457,5 +457,18 @@ mod tests {
                 assert!(text.contains("action=\"/x/&quot;$$h{urn:evil}/"), "{text}");
             }
         }
+    }
+
+    /// A host serving these views under a strict CSP (`style-src 'self'`) refuses an inline
+    /// style, so no template carries one; a host styles the `inquiry-*` classes instead.
+    #[test]
+    fn templates_carry_no_inline_style() {
+        let mount = Mount::new(crate::Layers::for_owner("b").unwrap());
+        for (_, name, text) in templates(&mount) {
+            assert!(!text.contains("style="), "{name}: {text}");
+            assert!(!text.contains("<style"), "{name}: {text}");
+        }
+        let all: String = templates(&mount).into_iter().map(|(_, _, t)| t).collect();
+        assert!(all.contains("class=\"inquiry-message\""), "{all}");
     }
 }

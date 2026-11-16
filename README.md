@@ -104,6 +104,8 @@ adds only routing and sign-in. Per mount: whose layers (`Layers`), which identit
 | `urn:iki:inquiry:action:name:block`, `…:unblock` | Sink | an intent for the edge's block set |
 | `urn:iki:inquiry:action:name:respond` | Sink | take from inquiry: handled (the view offers the `mailto:` link) |
 
+The views carry no inline style, so a host can serve them under a strict CSP (`style-src 'self'`). A host styles one class: `.inquiry-message { white-space: pre-line; }` keeps a message's line breaks in its "Full message" disclosure; without it the text still reads, run together.
+
 Every action takes `inquiry=<id>` and runs under the caller's own grant. A move is OUT the new
 copy, THEN TAKE the old, so a failure between the two leaves the inquiry in both layers, never
 in neither; an action on an inquiry another action took is a Conflict naming who took it, and

@@ -25,6 +25,10 @@ Three parts: the layers client (`src/view.rs`, `src/action.rs`), the holding sta
 | The day's spam | `urn:iki:inquiry:view:name:spam`, a whole HTML page | a count, two tables (arrivals by site, by what sent them to spam), then each arrival: an excerpt as its heading, site, reason, time, and buttons |
 | An action's answer | `urn:iki:inquiry:action:name:{action}`, one line of `text/plain` | what was done, for example "Moved inquiry a1 from spam to your inquiries." A refusal is the kernel's typed error. |
 
+The views carry no inline style (a strict CSP refuses one); the host styles
+`.inquiry-message` with `white-space: pre-line` so a message keeps its line breaks.
+`templates_carry_no_inline_style` in `src/view.rs` checks every template.
+
 Buttons post by default to `/inquiry/action/name/{action}`. The templates and rendered
 parts share `urn:iki:inquiry:template:name:{name}`; their data comes from
 `urn:iki:inquiry:data:pending:site:{key}` (a hex-encoded site) and
@@ -155,3 +159,4 @@ technology, if you are comfortable sharing them. Anything security-sensitive goe
 | 2026-11-14 | The holding stage's text answer. |
 | 2026-11-14 | The edge half's text answers. |
 | 2026-11-14 | Singular, type-first layer and resource names with named keys. |
+| 2026-11-16 | No inline style in the views; the full message's line breaks come from the host's `.inquiry-message` rule. |
