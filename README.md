@@ -115,6 +115,17 @@ The layer files a deployment needs are in [`layers/`](layers): one JSON-LD conte
 layer, and closed shapes for the inquiry, spam and holding tuplespaces, the intents tuplespace
 and the examples channel. The tests open a real `ikigai-layers` host on exactly these files.
 
+## The vocabulary
+
+[`src/vocabulary.ttl`](src/vocabulary.ttl) (`vocab::VOCABULARY`) is the `inq:` vocabulary, the
+document served at <https://ikigai-rs.dev/ns/inquiry>. Published terms come first: the layers'
+stamps are `dcterms:created` and `prov:wasAttributedTo`, and each `inq:` term names the
+schema:, dcterms:, prov:, oa: or skos: term it is near (a subproperty or subclass only where
+that holds, otherwise a SKOS mapping). `tests/vocabulary.rs` checks that it defines exactly the
+`inq:` terms the shipped context and shapes use, with their ranges. Its `owl:versionInfo` is
+the crate version; it is deployed by hand, and ikigai-devtools' `ns-drift` compares the live
+copy with this repository's main, so redeploy after a release that changes it.
+
 ## Accessibility
 
 The layers client's two views and its action messages, the holding stage's plain-text answer
