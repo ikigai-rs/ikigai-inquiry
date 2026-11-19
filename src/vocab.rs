@@ -24,6 +24,19 @@ pub const EXAMPLE_SHAPES: &str = include_str!("../layers/example.shapes.ttl");
 /// The closed shapes of the intents layer: `layers/intent.shapes.ttl`.
 pub const INTENT_SHAPES: &str = include_str!("../layers/intent.shapes.ttl");
 
+/// The `inq:` vocabulary as Turtle, `src/vocabulary.ttl`: an `owl:Ontology` at
+/// `https://ikigai-rs.dev/ns/inquiry` defining every `inq:` term the layer files use. This is
+/// the document served at that address, and its `owl:versionInfo` is this crate's version.
+///
+/// ```
+/// let header = ikigai_inquiry::vocab::VOCABULARY
+///     .lines()
+///     .find(|line| line.trim_start().starts_with("owl:versionInfo"))
+///     .unwrap();
+/// assert_eq!(header, format!("    owl:versionInfo \"{}\" .", env!("CARGO_PKG_VERSION")));
+/// ```
+pub const VOCABULARY: &str = include_str!("vocabulary.ttl");
+
 /// `inq:{local}`.
 pub(crate) fn inq(local: &str) -> String {
     format!("{INQ}{local}")

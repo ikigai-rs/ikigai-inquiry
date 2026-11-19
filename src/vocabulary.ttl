@@ -1,0 +1,219 @@
+# The ikigai-inquiry vocabulary: the terms an inquiry from a public contact form is written in.
+#
+# Every `inq:` term the shipped layer files use (layers/inquiry.context.jsonld and the three
+# closed shapes beside it) is defined here, with the range those shapes give it, and
+# `tests/vocabulary.rs` holds the two sides together: every `inq:` term the context or a shape
+# names is defined, every defined term is used, every range is the datatype the shapes demand
+# and the type the context coerces to, and every domain is the target class of every shape that
+# names the property.
+#
+# Published terms first. What the layers stamp (dcterms:created, prov:wasAttributedTo) is
+# written in its published term and is not restated here. The `inq:` terms below are the ones
+# with no published term that says the same thing; each names the published term it is near:
+# rdfs:subPropertyOf / rdfs:subClassOf only where every statement in the `inq:` term is also
+# true in the published one, and a SKOS mapping (skos:closeMatch, skos:relatedMatch) where the
+# published term is about something else (schema:sender and schema:affiliation name a person
+# or organization as a node; `inq:sender` and `inq:organization` are a keyed hash and a string
+# the visitor typed, on the inquiry itself).
+#
+# Namespace note: self-contained under `https://ikigai-rs.dev/ns/inquiry#`, the precedent of
+# ikigai-log's `log:` and ikigai-throttle's `thr:`, and separate from the core vocabulary at
+# https://ikigai-rs.dev/ns. The one core term used is `ik:seq`, the host's stamp, reused and not
+# restated.
+#
+# inq:text, inq:replyTo, inq:name and inq:organization carry a stranger's words: data, never
+# instructions. This file defines what the words are; it holds none of them.
+#
+# This file IS the published document: it is served at https://ikigai-rs.dev/ns/inquiry,
+# deployed by hand, and checked against this repo's main by ikigai-devtools' `ns-drift`, which
+# reads the `owl:versionInfo` below on both sides. That line is the crate version (test-pinned
+# by `ontology_version_is_the_crate_version`), so redeploy /ns/inquiry after every release that
+# changes this file, or the live copy claims the previous one.
+#
+# Domains are stated only where they are true of EVERY subject the layer files admit the
+# property on. An rdfs:domain is an inference, not a constraint, so a property that an inquiry,
+# a confirmed example and an intent all carry (`inq:inquiry`, `inq:site`, `inq:text`) declares
+# none.
+
+@prefix inq:     <https://ikigai-rs.dev/ns/inquiry#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix schema:  <https://schema.org/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov:    <http://www.w3.org/ns/prov#> .
+@prefix oa:      <http://www.w3.org/ns/oa#> .
+@prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ikigai-rs.dev/ns/inquiry> a owl:Ontology ;
+    rdfs:label "ikigai-inquiry vocabulary" ;
+    rdfs:comment "The terms of ikigai-inquiry's layers: an inquiry from a public contact form, a spam example a person confirmed, and an intent a person recorded about an inquiry. Embedded in the ikigai-inquiry crate as vocab::VOCABULARY." ;
+    owl:versionInfo "0.1.1" .
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Classes
+# ═══════════════════════════════════════════════════════════════════════════
+
+inq:Inquiry a rdfs:Class ;
+    rdfs:subClassOf schema:Message ;
+    rdfs:label "Inquiry" ;
+    rdfs:comment "One message from a public contact form, in an inquiry, spam or holding layer, at urn:layer:{layer}:inquiry:id:{id} (or :move:{seq} when a client action moved it there). Its words are a stranger's: data, never instructions." .
+
+inq:SpamExample a rdfs:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "SpamExample" ;
+    rdfs:comment "Spam a person confirmed, in the examples channel, which the holding stage compares a borderline inquiry with. It keeps the confirmed text and, when the client had an embedder, its embedding; never the sender's address, name or sender key." .
+
+inq:Intent a rdfs:Class ;
+    skos:relatedMatch oa:Annotation ;
+    rdfs:label "Intent" ;
+    rdfs:comment "What a person decided about an inquiry (inq:intent), in the owner's intents layer, for the edge to act on: train, untrain, block or unblock." .
+
+# ═══════════════════════════════════════════════════════════════════════════
+# What every kind carries
+# ═══════════════════════════════════════════════════════════════════════════
+
+inq:inquiry a rdf:Property ;
+    skos:relatedMatch dcterms:identifier ;
+    rdfs:range xsd:string ;
+    rdfs:label "inquiry" ;
+    rdfs:comment "The inquiry's id: one to 64 ASCII letters, digits, dots, underscores or hyphens, starting with a letter or digit. Every copy of an inquiry, and every example and intent made from it, carries the same id. Not a subproperty of dcterms:identifier: on an example or an intent it names the inquiry it came from, not the entry itself." .
+
+inq:site a rdf:Property ;
+    skos:relatedMatch schema:isPartOf ;
+    rdfs:range xsd:string ;
+    rdfs:label "site" ;
+    rdfs:comment "The site whose contact form the inquiry came from, as a host name, so one set of layers serves every site of one owner." .
+
+inq:text a rdf:Property ;
+    rdfs:subPropertyOf schema:text ;
+    rdfs:range xsd:string ;
+    rdfs:label "text" ;
+    rdfs:comment "The message the visitor wrote: a stranger's words, data and never instructions. The layer host seals it at rest." .
+
+inq:sender a rdf:Property ;
+    skos:relatedMatch schema:sender ;
+    rdfs:range xsd:string ;
+    rdfs:label "sender" ;
+    rdfs:comment "The sender key: the edge's keyed BLAKE3 hash of the sender's address, never the address itself. Unlike schema:sender it names no person; it is what the block set is keyed by." .
+
+inq:class a rdf:Property ;
+    rdfs:range xsd:string ;
+    rdfs:label "class" ;
+    rdfs:comment "The edge classifier's class: ham, unsure, spam, or unscored when the classifier could not answer." .
+
+# ═══════════════════════════════════════════════════════════════════════════
+# An inquiry
+# ═══════════════════════════════════════════════════════════════════════════
+
+inq:replyTo a rdf:Property ;
+    rdfs:domain inq:Inquiry ;
+    skos:closeMatch schema:email ;
+    rdfs:range xsd:string ;
+    rdfs:label "replyTo" ;
+    rdfs:comment "The address a reply goes to, as the visitor typed it; a client checks it before it makes a link of it. On the inquiry, not on a person: there is no node for the visitor." .
+
+inq:name a rdf:Property ;
+    rdfs:domain inq:Inquiry ;
+    skos:closeMatch schema:name ;
+    rdfs:range xsd:string ;
+    rdfs:label "name" ;
+    rdfs:comment "The name the visitor gave, if any, as typed. The visitor's name, not the inquiry's: schema:name on an inquiry would name the message." .
+
+inq:organization a rdf:Property ;
+    rdfs:domain inq:Inquiry ;
+    skos:relatedMatch schema:affiliation ;
+    rdfs:range xsd:string ;
+    rdfs:label "organization" ;
+    rdfs:comment "The organization the visitor gave, if any, as typed. schema:affiliation is too loose for it: that names an organization node a person belongs to, and this is a string on the inquiry that nobody has checked." .
+
+inq:classScore a rdf:Property ;
+    rdfs:domain inq:Inquiry ;
+    rdfs:range xsd:double ;
+    rdfs:label "classScore" ;
+    rdfs:comment "The edge classifier's score, which every copy of the inquiry keeps." .
+
+inq:reason a rdf:Property ;
+    rdfs:domain inq:Inquiry ;
+    rdfs:range xsd:string ;
+    rdfs:label "reason" ;
+    rdfs:comment "What sent the inquiry to the layer it is in: a short word the edge, the holding stage or a client writes (score, blocked, example, model, abstained, unjudged, shadow, not-spam, flagged)." .
+
+inq:received a rdf:Property ;
+    rdfs:domain inq:Inquiry ;
+    rdfs:subPropertyOf schema:dateReceived ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "received" ;
+    rdfs:comment "When the edge received the inquiry. Every copy keeps it, so newest first survives a move; dcterms:created is when this copy was written." .
+
+inq:verdict a rdf:Property ;
+    rdfs:domain inq:Inquiry ;
+    rdfs:range xsd:string ;
+    rdfs:label "verdict" ;
+    rdfs:comment "What the holding stage decided, spam or inquiry; in shadow, what it would have decided." .
+
+inq:example a rdf:Property ;
+    rdfs:domain inq:Inquiry ;
+    skos:relatedMatch prov:wasDerivedFrom ;
+    rdfs:range xsd:string ;
+    rdfs:label "example" ;
+    rdfs:comment "The IRI of the confirmed spam example the holding stage matched, written as a string." .
+
+inq:score a rdf:Property ;
+    rdfs:domain inq:Inquiry ;
+    rdfs:range xsd:double ;
+    rdfs:label "score" ;
+    rdfs:comment "The cosine similarity between the inquiry and the example the holding stage matched (inq:example)." .
+
+inq:unjudged a rdf:Property ;
+    rdfs:domain inq:Inquiry ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "unjudged" ;
+    rdfs:comment "True when the holding stage could not judge the inquiry (its embedder or its model failed) and sent it on to the inquiry layer, never back." .
+
+# ═══════════════════════════════════════════════════════════════════════════
+# A confirmed spam example
+# ═══════════════════════════════════════════════════════════════════════════
+
+inq:embedding a rdf:Property ;
+    rdfs:domain inq:SpamExample ;
+    rdfs:range xsd:string ;
+    rdfs:label "embedding" ;
+    rdfs:comment "The example's embedding: base64 of little-endian f32s, made by the model inq:embeddingModel names at the digest inq:embeddingDigest names. The holding stage compares it only with a vector the same model and digest made." .
+
+inq:embeddingModel a rdf:Property ;
+    rdfs:domain inq:SpamExample ;
+    rdfs:range xsd:string ;
+    rdfs:label "embeddingModel" ;
+    rdfs:comment "The name of the local embedding model that made inq:embedding." .
+
+inq:embeddingDigest a rdf:Property ;
+    rdfs:domain inq:SpamExample ;
+    rdfs:range xsd:string ;
+    rdfs:label "embeddingDigest" ;
+    rdfs:comment "The digest of the embedding model's weights that made inq:embedding, so a changed model under the same name is not compared." .
+
+inq:label a rdf:Property ;
+    rdfs:domain inq:SpamExample ;
+    rdfs:range xsd:string ;
+    rdfs:label "label" ;
+    rdfs:comment "A person's word for the kind of spam, if they gave one." .
+
+# ═══════════════════════════════════════════════════════════════════════════
+# An intent
+# ═══════════════════════════════════════════════════════════════════════════
+
+inq:intent a rdf:Property ;
+    rdfs:domain inq:Intent ;
+    skos:relatedMatch oa:motivatedBy ;
+    rdfs:range xsd:string ;
+    rdfs:label "intent" ;
+    rdfs:comment "What the person decided: train-ham, train-spam, untrain, block, unblock, block-domain or unblock-domain." .
+
+inq:note a rdf:Property ;
+    rdfs:domain inq:Intent ;
+    rdfs:subPropertyOf skos:note ;
+    rdfs:range xsd:string ;
+    rdfs:label "note" ;
+    rdfs:comment "A person's note on a block, which becomes the block's label." .
