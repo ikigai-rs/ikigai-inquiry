@@ -11,7 +11,7 @@ use ikigai_core::Time;
 use serde_json::{json, Value};
 
 use crate::key::{Key, Scope};
-use crate::store::Store;
+use crate::store::{Store, Version};
 
 /// The document the block set is kept in.
 const DOCUMENT: &str = "block";
@@ -81,89 +81,143 @@ pub fn check_label(label: &str) -> Result<(), String> {
 }
 
 /// The blocks, over the store that keeps them.
+///
+/// More than one process opens the same block set (the contact daemon, the HTTP door, a shell's
+/// `import-blocks`), so none trusts what it read once: a check reads the document again when
+/// its [`Version`] has changed, and a write goes through [`Store::update`], applying its change
+/// to the document as it is on disk, never to a copy in memory.
 pub struct BlockSet {
     store: Arc<dyn Store>,
-    blocks: Mutex<BTreeMap<Key, Block>>,
+    read: Mutex<Read>,
+}
+
+/// What a set last read, and the version it read it at (`None`: read it again).
+struct Read {
+    version: Option<Version>,
+    blocks: BTreeMap<Key, Block>,
 }
 
 impl std::fmt::Debug for BlockSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BlockSet")
-            .field("blocks", &self.blocks.lock().expect("block lock").len())
+            .field(
+                "blocks",
+                &self.read.lock().expect("block lock").blocks.len(),
+            )
             .finish()
     }
+}
+
+/// The blocks `bytes` holds: none when there is no document yet. A document that is not a
+/// block set is refused, never read as empty.
+fn parse(bytes: Option<&[u8]>) -> Result<BTreeMap<Key, Block>, String> {
+    let mut blocks = BTreeMap::new();
+    if let Some(bytes) = bytes {
+        let refused = || format!("the `{DOCUMENT}` document is not a block set: refused");
+        let value: Value = serde_json::from_slice(bytes).map_err(|_| refused())?;
+        for record in value
+            .get("blocks")
+            .and_then(Value::as_array)
+            .ok_or_else(refused)?
+        {
+            let block = Block::from_json(record).ok_or_else(refused)?;
+            blocks.insert(block.key.clone(), block);
+        }
+    }
+    Ok(blocks)
+}
+
+fn serialize(blocks: &BTreeMap<Key, Block>) -> Vec<u8> {
+    let records: Vec<Value> = blocks.values().map(Block::to_json).collect();
+    json!({ "blocks": records }).to_string().into_bytes()
 }
 
 impl BlockSet {
     /// The block set in `store`, empty when it holds none yet. A document that is not a block
     /// set is refused, never read as empty.
     pub fn open(store: Arc<dyn Store>) -> Result<BlockSet, String> {
-        let mut blocks = BTreeMap::new();
-        if let Some(bytes) = store.load(DOCUMENT)? {
-            let refused = || format!("the `{DOCUMENT}` document is not a block set: refused");
-            let value: Value = serde_json::from_slice(&bytes).map_err(|_| refused())?;
-            for record in value
-                .get("blocks")
-                .and_then(Value::as_array)
-                .ok_or_else(refused)?
-            {
-                let block = Block::from_json(record).ok_or_else(refused)?;
-                blocks.insert(block.key.clone(), block);
-            }
-        }
-        Ok(BlockSet {
+        let set = BlockSet {
             store,
-            blocks: Mutex::new(blocks),
-        })
+            read: Mutex::new(Read {
+                version: None,
+                blocks: BTreeMap::new(),
+            }),
+        };
+        set.refresh(&mut set.read.lock().expect("block lock"))?;
+        Ok(set)
     }
 
-    /// The block on `key` that holds at `now`, if any.
+    /// Read the document again unless its version is the one last read. The version is asked
+    /// before the document is loaded, so what is kept is never older than its version says.
+    fn refresh(&self, read: &mut Read) -> Result<(), String> {
+        let version = self.store.version(DOCUMENT)?;
+        if version.is_some() && version == read.version {
+            return Ok(());
+        }
+        read.blocks = parse(self.store.load(DOCUMENT)?.as_deref())?;
+        read.version = version;
+        Ok(())
+    }
+
+    /// The block on `key` that holds at `now`, if any, as the store holds it now: a block
+    /// another process wrote or lifted counts without a restart. When the document cannot be
+    /// read again (it is damaged, or the store fails), the blocks last read still answer.
     pub fn holding(&self, key: &Key, now: Time) -> Option<Block> {
-        self.blocks
-            .lock()
-            .expect("block lock")
-            .get(key)
-            .filter(|b| b.holds_at(now))
-            .cloned()
+        let mut read = self.read.lock().expect("block lock");
+        let _ = self.refresh(&mut read);
+        read.blocks.get(key).filter(|b| b.holds_at(now)).cloned()
+    }
+
+    /// Apply `change` to the blocks as the store holds them, under the store's lock, saving the
+    /// result when `change` answers that it changed something.
+    fn update(
+        &self,
+        mut change: impl FnMut(&mut BTreeMap<Key, Block>) -> Result<bool, String>,
+    ) -> Result<(), String> {
+        let mut read = self.read.lock().expect("block lock");
+        let mut written = None;
+        self.store.update(DOCUMENT, &mut |bytes| {
+            let mut blocks = parse(bytes)?;
+            let changed = change(&mut blocks)?;
+            let bytes = changed.then(|| serialize(&blocks));
+            written = Some(blocks);
+            Ok(bytes)
+        })?;
+        if let Some(blocks) = written {
+            // Another writer may save after this one before the next check, so the version
+            // is not trusted here: the next check reads the document again.
+            read.blocks = blocks;
+            read.version = None;
+        }
+        Ok(())
     }
 
     /// Write `block`, replacing any block on its key, and drop every block expired at `now`.
     /// Saved before the answer; nothing changes when the save fails.
     pub fn put(&self, block: Block, now: Time) -> Result<(), String> {
-        let mut blocks = self.blocks.lock().expect("block lock");
-        let mut next = blocks.clone();
-        next.retain(|_, b| b.holds_at(now));
-        next.insert(block.key.clone(), block);
-        if next.len() > MAX_BLOCKS {
-            return Err(format!(
-                "the block set holds {MAX_BLOCKS} blocks, its bound: lift some first"
-            ));
-        }
-        self.save(&next)?;
-        *blocks = next;
-        Ok(())
+        self.update(|blocks| {
+            blocks.retain(|_, b| b.holds_at(now));
+            blocks.insert(block.key.clone(), block.clone());
+            if blocks.len() > MAX_BLOCKS {
+                return Err(format!(
+                    "the block set holds {MAX_BLOCKS} blocks, its bound: lift some first"
+                ));
+            }
+            Ok(true)
+        })
     }
 
     /// Lift the block on `key`, answering it, or `None` when there was none (lifting is
     /// idempotent). Expired blocks are dropped too.
     pub fn lift(&self, key: &Key, now: Time) -> Result<Option<Block>, String> {
-        let mut blocks = self.blocks.lock().expect("block lock");
-        let mut next = blocks.clone();
-        let lifted = next.remove(key);
-        next.retain(|_, b| b.holds_at(now));
-        if next.len() != blocks.len() {
-            self.save(&next)?;
-            *blocks = next;
-        }
+        let mut lifted = None;
+        self.update(|blocks| {
+            let before = blocks.len();
+            lifted = blocks.remove(key);
+            blocks.retain(|_, b| b.holds_at(now));
+            Ok(blocks.len() != before)
+        })?;
         Ok(lifted)
-    }
-
-    fn save(&self, blocks: &BTreeMap<Key, Block>) -> Result<(), String> {
-        let records: Vec<Value> = blocks.values().map(Block::to_json).collect();
-        self.store.save(
-            DOCUMENT,
-            json!({ "blocks": records }).to_string().as_bytes(),
-        )
     }
 }
 

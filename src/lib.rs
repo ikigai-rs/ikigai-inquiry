@@ -148,7 +148,7 @@ pub use mount::{Layers, Mount, View};
 pub use policy::Policy;
 #[cfg(not(target_family = "wasm"))]
 pub use store::DirStore;
-pub use store::{MemoryStore, Store};
+pub use store::{Change, MemoryStore, Store, Version};
 
 /// The pending inquiries view.
 pub const PENDING_VIEW: &str = "urn:iki:inquiry:view:name:pending";
