@@ -49,7 +49,10 @@ as lowercase UTF-8 hex) and `urn:iki:inquiry:data:spam:date:{day}:part:{part}` (
 Within the layer host's `urn:layer:{layer}:` namespace, inquiry subjects use
 `inquiry:id:{id}`, moved copies add `:move:{seq}`, and intents use
 `intent:name:{intent}:inquiry:{id}:occurrence:{suffix}`. The edge store uses `block.json`
-and `count-date-{date}.json`. This unpublished crate provides no aliases for previous names.
+and `count-date-{date}.json`. More than one process may open one store directory (the
+contact daemon, the HTTP door, a shell's `import-blocks`): a block set's check reads
+`block.json` again whenever the file has changed, and its writes take `.block.json.lock`, so a
+block or a lift one process writes counts in the others at once and no write is lost. This unpublished crate provides no aliases for previous names.
 
 ## The edge half
 
