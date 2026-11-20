@@ -37,8 +37,9 @@
     # The name and organization the visitor gave, if any.
     [ sh:path inq:name ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 256 ] ,
     [ sh:path inq:organization ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 256 ] ,
-    # The edge's keyed hash of the sender, never the address itself.
-    [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 128 ] ,
+    # The edge's keyed hash of the sender: 64 lowercase hex digits, never the address itself.
+    [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:pattern "^[0-9a-f]{64}$" ] ,
     # The edge's classifier: its class (unscored when it could not answer) and its score.
     [ sh:path inq:class ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:in ( "ham" "unsure" "spam" "unscored" ) ] ,
