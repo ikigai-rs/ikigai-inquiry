@@ -407,7 +407,7 @@ pub fn arrive(f: &Fixture, id: &str, words: &str) {
         format!("{INQ}inquiry"): id,
         format!("{INQ}site"): "a.example",
         format!("{INQ}text"): words,
-        format!("{INQ}sender"): format!("hash-of-{id}"),
+        format!("{INQ}sender"): sender_of(id),
         format!("{INQ}replyTo"): "visitor@a.example",
         format!("{INQ}reason"): "score",
         format!("{INQ}received"): {
@@ -539,4 +539,12 @@ pub fn field(node: &Value, term: &str) -> Option<String> {
         }),
         _ => None,
     }
+}
+
+/// A sender key in the form the edge writes (64 lowercase hex digits), standing in for the
+/// keyed hash of inquiry `id`'s sender.
+pub fn sender_of(id: &str) -> String {
+    blake3::hash(format!("sender-of-{id}").as_bytes())
+        .to_hex()
+        .to_string()
 }

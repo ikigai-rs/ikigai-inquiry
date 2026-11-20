@@ -23,11 +23,13 @@
               "unblock-domain" ) ] ,
     [ sh:path inq:inquiry ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:pattern "^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$" ] ,
-    # The site, and below the sender, when the client found the inquiry pending.
+    # The site, and below the sender key (64 lowercase hex digits, never an address), when the
+    # client found the inquiry pending.
     [ sh:path inq:site ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:minLength 1 ; sh:maxLength 253 ] ,
     [ sh:path inq:text ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 10000 ] ,
-    [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:maxLength 128 ] ,
+    [ sh:path inq:sender ; sh:maxCount 1 ; sh:datatype xsd:string ;
+      sh:pattern "^[0-9a-f]{64}$" ] ,
     [ sh:path inq:class ; sh:maxCount 1 ; sh:datatype xsd:string ;
       sh:in ( "ham" "unsure" "spam" "unscored" ) ] ,
     [ sh:path inq:note ; sh:maxCount 1 ; sh:datatype xsd:string ;

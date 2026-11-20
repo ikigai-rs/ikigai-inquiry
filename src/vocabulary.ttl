@@ -96,7 +96,7 @@ inq:sender a rdf:Property ;
     skos:relatedMatch schema:sender ;
     rdfs:range xsd:string ;
     rdfs:label "sender" ;
-    rdfs:comment "The sender key: the edge's keyed BLAKE3 hash of the sender's address, never the address itself. Unlike schema:sender it names no person; it is what the block set is keyed by." .
+    rdfs:comment "The sender key: the edge's keyed BLAKE3 hash of the sender's address, 64 lowercase hex digits, never the address itself. Unlike schema:sender it names no person; it is what the block set is keyed by." .
 
 inq:class a rdf:Property ;
     rdfs:range xsd:string ;

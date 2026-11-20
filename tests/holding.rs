@@ -124,7 +124,10 @@ fn a_down_model_sends_the_inquiry_on_never_back() {
     assert_eq!(field(node, "text").as_deref(), Some(PERSON));
     assert_eq!(field(node, "site").as_deref(), Some("a.example"));
     assert_eq!(field(node, "replyTo").as_deref(), Some("visitor@a.example"));
-    assert_eq!(field(node, "sender").as_deref(), Some("hash-of-d1"));
+    assert_eq!(
+        field(node, "sender").as_deref(),
+        Some(sender_of("d1").as_str())
+    );
     // A second pass finds nothing to do and puts nothing back.
     let again = run(&f, WORKER_A, 60).unwrap();
     assert!(again.contains("0 inquiries sent on"), "{again}");

@@ -52,7 +52,7 @@ fn not_spam_moves_to_inquiry_and_asks_to_train_ham() {
     assert_eq!(copy["site"], "a.example");
     assert_eq!(copy["text"], "Hello, a real question.");
     assert_eq!(copy["replyTo"], "ada@example.org");
-    assert_eq!(copy["sender"], "hash-of-a1");
+    assert_eq!(copy["sender"], sender_of("a1"));
     // The edge's arrival time survives the move.
     assert_eq!(copy["received"], "2026-11-14T09:00:00.000Z");
 
@@ -61,7 +61,7 @@ fn not_spam_moves_to_inquiry_and_asks_to_train_ham() {
     assert_eq!(intents[0]["intent"], "train-ham");
     assert_eq!(intents[0]["inquiry"], "a1");
     assert_eq!(intents[0]["text"], "Hello, a real question.");
-    assert_eq!(intents[0]["sender"], "hash-of-a1");
+    assert_eq!(intents[0]["sender"], sender_of("a1"));
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn confirm_spam_keeps_an_embedded_example() {
         m.embedder(ikigai_core::Iri::parse(EMBEDDER).unwrap())
     });
     arrive(&f, "inquiry-spam-b", arrival("s1", "b.example", "Buy now"));
-    assert_eq!(pending(&f, "inquiry-spam-b")[0]["sender"], "hash-of-s1");
+    assert_eq!(pending(&f, "inquiry-spam-b")[0]["sender"], sender_of("s1"));
     let said = act(&f, &person(BRIAN), "confirm-spam", "s1").unwrap();
     assert_eq!(
         said,
@@ -233,7 +233,7 @@ fn block_and_unblock_are_intents_for_the_edge() {
     let intents = intents(&f);
     assert_eq!(intents.len(), 2);
     assert_eq!(intents[0]["intent"], "block");
-    assert_eq!(intents[0]["sender"], "hash-of-s1");
+    assert_eq!(intents[0]["sender"], sender_of("s1"));
     assert_eq!(intents[0]["site"], "b.example");
     assert!(intents[0].get("text").is_none(), "a block carries no text");
     assert_eq!(intents[1]["intent"], "unblock");
@@ -294,7 +294,7 @@ fn example_layer_refuses_sender_keys() {
         format!("{INQ}inquiry"): "s1",
         format!("{INQ}site"): "b.example",
         format!("{INQ}text"): "Synthetic spam example",
-        format!("{INQ}sender"): "hash-of-s1",
+        format!("{INQ}sender"): sender_of("s1"),
     });
     let result = issue(
         &f.kernel,
@@ -318,4 +318,64 @@ fn example_layer_refuses_sender_keys() {
     )
     .unwrap();
     assert_eq!(examples(&f).len(), 1);
+}
+
+/// `inq:sender` holds the edge's keyed hash, 64 lowercase hex digits, and never an address:
+/// the intent and inquiry shapes refuse anything else.
+#[test]
+fn sender_holds_only_a_sender_key() {
+    let f = fixture("sender-form", |m| m);
+    let key = "0123456789abcdef".repeat(4);
+    let not_keys = [
+        "ada@example.org".to_string(),
+        key.to_uppercase(),
+        key[..63].to_string(),
+        format!("{key}0"),
+        format!("{key}\n"),
+    ];
+    let intent = |n: u32, sender: &str| {
+        serde_json::json!({
+            "@id": format!("urn:layer:inquiry-intent-b:intent:name:block:inquiry:s1:occurrence:{n}"),
+            "@type": format!("{INQ}Intent"),
+            format!("{INQ}intent"): "block",
+            format!("{INQ}inquiry"): "s1",
+            format!("{INQ}sender"): sender,
+        })
+    };
+    let inquiry = |id: &str, sender: &str| {
+        serde_json::json!({
+            "@id": format!("urn:layer:inquiry-b:inquiry:id:{id}"),
+            "@type": format!("{INQ}Inquiry"),
+            format!("{INQ}inquiry"): id,
+            format!("{INQ}site"): "a.example",
+            format!("{INQ}text"): "Hello.",
+            format!("{INQ}sender"): sender,
+        })
+    };
+    let sink = |cap: &Capability, layer: &str, node: Value| {
+        issue(
+            &f.kernel,
+            cap,
+            Verb::Sink,
+            &format!("urn:layer:{layer}:tuples"),
+            &[("content", &node.to_string())],
+        )
+    };
+    for (n, bad) in not_keys.iter().enumerate() {
+        assert!(
+            sink(&person(BRIAN), "inquiry-intent-b", intent(n as u32, bad)).is_err(),
+            "the intent shapes admitted inq:sender {bad:?}"
+        );
+        assert!(
+            sink(&edge(), "inquiry-b", inquiry(&format!("x{n}"), bad)).is_err(),
+            "the inquiry shapes admitted inq:sender {bad:?}"
+        );
+    }
+    assert!(intents(&f).is_empty());
+    assert!(pending(&f, "inquiry-b").is_empty());
+    // A sender key is admitted by both.
+    sink(&person(BRIAN), "inquiry-intent-b", intent(99, &key)).unwrap();
+    sink(&edge(), "inquiry-b", inquiry("k1", &key)).unwrap();
+    assert_eq!(intents(&f).len(), 1);
+    assert_eq!(pending(&f, "inquiry-b").len(), 1);
 }
