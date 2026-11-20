@@ -235,7 +235,7 @@ pub fn arrive(f: &Fixture, layer: &str, a: Arrival<'_>) {
         format!("{INQ}inquiry"): a.id,
         format!("{INQ}site"): a.site,
         format!("{INQ}text"): a.text,
-        format!("{INQ}sender"): format!("hash-of-{}", a.id),
+        format!("{INQ}sender"): sender_of(a.id),
         format!("{INQ}reason"): a.reason,
         format!("{INQ}received"): {
             "@value": a.received,
@@ -292,4 +292,12 @@ pub fn act(f: &Fixture, cap: &Capability, action: &str, id: &str) -> Result<Stri
         &[("inquiry", id)],
     )
     .map(text)
+}
+
+/// A sender key in the form the edge writes (64 lowercase hex digits), standing in for the
+/// keyed hash of inquiry `id`'s sender.
+pub fn sender_of(id: &str) -> String {
+    blake3::hash(format!("sender-of-{id}").as_bytes())
+        .to_hex()
+        .to_string()
 }
