@@ -5,6 +5,9 @@
 
 #![allow(dead_code)]
 
+#[path = "../bridge/mod.rs"]
+mod bridge;
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -341,9 +344,10 @@ pub fn fixture(name: &str, policy: Policy) -> Fixture {
     let backend_space = EndpointSpace::new()
         .bind(Exact::new("urn:llm:embed"), embedder)
         .bind(Exact::new(CLASSIFIER), classifier);
+    let clock = Arc::new(TestClock(AtomicU64::new(T0)));
     let gate = Arc::new(Gate::default());
     let layers = Gated {
-        inner: Arc::new(ikigai_layers::space(&host)),
+        inner: Arc::new(bridge::space(ikigai_layers::space(&host), clock.clone())),
         gate: gate.clone(),
     };
     let client = ikigai_inquiry::space(
@@ -357,7 +361,6 @@ pub fn fixture(name: &str, policy: Policy) -> Fixture {
         Arc::new(backend_space),
         Arc::new(layers),
     ];
-    let clock = Arc::new(TestClock(AtomicU64::new(T0)));
     let kernel = Kernel::new(Arc::new(Fallback::new(spaces))).with_clock(clock.clone());
     Fixture {
         dir,

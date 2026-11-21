@@ -1,6 +1,6 @@
 [package]
 name = "ikigai-inquiry"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Inquiries from public contact forms as ikigai resources: routed into layers by a classification funnel, with a layers client any host mounts."
@@ -12,11 +12,12 @@ categories = ["wasm", "text-processing"]
 
 [dependencies]
 # The released kernel, consumed from crates.io, so a host links exactly one `ikigai-core`.
-# 0.3.0 is the line the hosts run. ⚠ `"0.3.0"` is also a ceiling below 0.4.0.
-ikigai-core = "0.3.0"
+# core 0.4.0 (scope opacity, structured denials; the cascade). ⚠ `"0.4.0"` is also a ceiling
+# below 0.5.0.
+ikigai-core = "0.4.0"
 # `compose` and `each` fill the views, so visitor text reaches a page only through `$h{…}`;
 # `html` is the escaping and link rules the views' Rust side shares with them.
-ikigai-fn = "0.11.0"
+ikigai-fn = "0.12.0"
 # The actions and the holding stage are `Endpoint`s, whose `invoke` is `async_trait`.
 async-trait = "0.1"
 # The layers' JSON faces (listings, JSON-LD graphs) and `urn:llm:embed`'s answer are JSON, and a
@@ -42,6 +43,12 @@ futures = "0.3"
 # so what the edge, the client and the stage write, take and race on is what the layers
 # actually admit.
 ikigai-layers = "0.10.1"
+# TEST-ONLY: ikigai-layers is still on core 0.3 and moves to 0.4.0 in wave 5 of the core 0.4.0
+# cascade. Until then its space runs in a core 0.3 kernel of its own, bridged to the tests'
+# core 0.4 kernel (`tests/bridge`). Drop this alias, and the bridge, in wave 5.
+ikigai-core-03 = { package = "ikigai-core", version = "0.3.0" }
+# The bridge carries requests across by their serde wire form. ⚠ `"1"` is `<2.0.0`.
+serde = "1"
 age = { version = "0.11.1", default-features = false }
 # The views are well-formed, so a test reads their structure as XML.
 roxmltree = "0.20"

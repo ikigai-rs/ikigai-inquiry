@@ -120,7 +120,7 @@ pub(crate) fn check_acting(mount: &Mount, inv: &Invocation<'_>, verb: Verb) -> R
     }
     match &mount.acting {
         Some(acting) if inv.capability.principal() != Some(acting.as_str()) => Err(Error::Denied(
-            format!("this inquiry client acts only as {acting}"),
+            format!("this inquiry client acts only as {acting}").into(),
         )),
         _ => Ok(()),
     }
