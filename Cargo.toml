@@ -41,14 +41,10 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 futures = "0.3"
 # The tests run against a real layer host, opened on the shapes and context this crate ships,
 # so what the edge, the client and the stage write, take and race on is what the layers
-# actually admit.
-ikigai-layers = "0.10.1"
-# TEST-ONLY: ikigai-layers is still on core 0.3 and moves to 0.4.0 in wave 5 of the core 0.4.0
-# cascade. Until then its space runs in a core 0.3 kernel of its own, bridged to the tests'
-# core 0.4 kernel (`tests/bridge`). Drop this alias, and the bridge, in wave 5.
-ikigai-core-03 = { package = "ikigai-core", version = "0.3.0" }
-# The bridge carries requests across by their serde wire form. ⚠ `"1"` is `<2.0.0`.
-serde = "1"
+# actually admit. core 0.4 cascade restore (ledger #3935): ikigai-layers 0.11.0 is on core 0.4,
+# so its space runs in the tests' own kernel, on the one `ikigai-core` the crate links.
+# ⚠ `"0.11.0"` is also a ceiling below 0.12.0.
+ikigai-layers = "0.11.0"
 age = { version = "0.11.1", default-features = false }
 # The views are well-formed, so a test reads their structure as XML.
 roxmltree = "0.20"

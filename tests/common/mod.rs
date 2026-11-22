@@ -5,9 +5,6 @@
 
 #![allow(dead_code)]
 
-#[path = "../bridge/mod.rs"]
-mod bridge;
-
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -192,7 +189,7 @@ pub fn fixture_with(
     let mut spaces: Vec<Arc<dyn Space>> = vec![
         Arc::new(client),
         Arc::new(embedder),
-        Arc::new(bridge::space(ikigai_layers::space(&host), clock.clone())),
+        Arc::new(ikigai_layers::space(&host)),
     ];
     spaces.extend(more);
     let kernel = Kernel::new(Arc::new(Fallback::new(spaces))).with_clock(clock);
