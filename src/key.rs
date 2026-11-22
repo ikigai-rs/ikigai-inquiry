@@ -1,8 +1,9 @@
 //! Sender keys: keyed BLAKE3 over a sender's address or domain, so a block names a sender
 //! without holding the address.
 //!
-//! - an **address key** is the keyed hash of the address, trimmed and lowercased;
-//! - a **domain key** is the keyed hash of `domain:<the domain, trimmed and lowercased>`, so no
+//! - an **address key** is the keyed hash of the address, trimmed and lowercased, its invisible
+//!   formatting characters (zero-width marks, the BOM, bidirectional marks) dropped;
+//! - a **domain key** is the keyed hash of `domain:<the domain, so normalized>`, so no
 //!   address hashes to a domain's key (an address always holds an `@`, and the `domain:` form
 //!   never does).
 //!
@@ -166,7 +167,8 @@ impl SenderKeys {
         ))
     }
 
-    /// The key of an address: trimmed and lowercased, nothing else folded.
+    /// The key of an address: trimmed and lowercased, its invisible formatting characters
+    /// dropped, nothing else folded.
     ///
     /// ```
     /// use ikigai_inquiry::SenderKeys;
@@ -226,7 +228,14 @@ impl SenderKeys {
 }
 
 fn normalize(text: &str, what: &str) -> Result<String, String> {
-    let text = text.trim().to_lowercase();
+    // The invisible formatting characters an excerpt drops (zero-width marks and joiners, the
+    // BOM, bidirectional marks) are dropped here too: an address carrying one shows on a page
+    // as the address without it, so it is the same sender, not a new key past a block.
+    let visible: String = text
+        .chars()
+        .filter(|&c| !crate::text::is_format(c))
+        .collect();
+    let text = visible.trim().to_lowercase();
     if text.is_empty() {
         return Err(format!("an empty {what}: refused"));
     }
@@ -286,6 +295,33 @@ mod tests {
         assert_ne!(plain, keys.address("a.na@gmail.com").unwrap());
         assert_ne!(plain, keys.address("ana+x@gmail.com").unwrap());
         assert_ne!(plain, keys.address("ana@googlemail.com").unwrap());
+    }
+
+    #[test]
+    fn an_invisible_mark_does_not_make_a_new_sender() {
+        // A zero-width space, a joiner, a BOM or a bidirectional mark shows nothing, so an
+        // address carrying one reads on the page as the address a person already blocked.
+        let keys = SenderKeys::new([4; 32]);
+        let address = keys.address("ana@spam.example").unwrap();
+        let domain = keys.domain("spam.example").unwrap();
+        for mark in [
+            "\u{200B}", "\u{200D}", "\u{FEFF}", "\u{200E}", "\u{202E}", "\u{2060}",
+        ] {
+            for typed in [
+                format!("{mark}ana@spam.example"),
+                format!("ana{mark}@spam.example"),
+                format!("ana@spam{mark}.example"),
+                format!("ana@spam.example{mark}"),
+            ] {
+                assert_eq!(keys.address(&typed), Ok(address.clone()), "{typed:?}");
+                assert_eq!(keys.domain_of(&typed), Ok(domain.clone()), "{typed:?}");
+            }
+            assert_eq!(
+                keys.domain(&format!("spam{mark}.example")),
+                Ok(domain.clone())
+            );
+        }
+        assert!(keys.address("\u{200B}@spam.example").is_err());
     }
 
     #[test]

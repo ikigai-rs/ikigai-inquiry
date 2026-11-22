@@ -49,7 +49,7 @@
 <https://ikigai-rs.dev/ns/inquiry> a owl:Ontology ;
     rdfs:label "ikigai-inquiry vocabulary" ;
     rdfs:comment "The terms of ikigai-inquiry's layers: an inquiry from a public contact form, a spam example a person confirmed, and an intent a person recorded about an inquiry. Embedded in the ikigai-inquiry crate as vocab::VOCABULARY." ;
-    owl:versionInfo "0.2.0" .
+    owl:versionInfo "0.2.1" .
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Classes
