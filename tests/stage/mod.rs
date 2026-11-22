@@ -5,9 +5,6 @@
 
 #![allow(dead_code)]
 
-#[path = "../bridge/mod.rs"]
-mod bridge;
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -347,7 +344,7 @@ pub fn fixture(name: &str, policy: Policy) -> Fixture {
     let clock = Arc::new(TestClock(AtomicU64::new(T0)));
     let gate = Arc::new(Gate::default());
     let layers = Gated {
-        inner: Arc::new(bridge::space(ikigai_layers::space(&host), clock.clone())),
+        inner: Arc::new(ikigai_layers::space(&host)),
         gate: gate.clone(),
     };
     let client = ikigai_inquiry::space(
