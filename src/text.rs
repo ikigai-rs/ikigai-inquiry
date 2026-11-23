@@ -37,7 +37,7 @@ pub fn excerpt(text: &str) -> String {
 
 /// The invisible formatting characters an excerpt drops: bidirectional embeddings,
 /// overrides, isolates and marks, zero-width joiners and spaces, the BOM.
-fn is_format(c: char) -> bool {
+pub(crate) fn is_format(c: char) -> bool {
     matches!(c,
         '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{2064}'
         | '\u{2066}'..='\u{2069}' | '\u{FEFF}' | '\u{061C}')

@@ -207,13 +207,14 @@ impl BlockSet {
         })
     }
 
-    /// Lift the block on `key`, answering it, or `None` when there was none (lifting is
+    /// Lift the block on `key`, answering it, or `None` when none held at `now` (lifting is
     /// idempotent). Expired blocks are dropped too.
     pub fn lift(&self, key: &Key, now: Time) -> Result<Option<Block>, String> {
         let mut lifted = None;
         self.update(|blocks| {
             let before = blocks.len();
-            lifted = blocks.remove(key);
+            // An expired block no longer held: it is dropped, but it was not lifted.
+            lifted = blocks.remove(key).filter(|b| b.holds_at(now));
             blocks.retain(|_, b| b.holds_at(now));
             Ok(blocks.len() != before)
         })?;
@@ -262,6 +263,18 @@ mod tests {
             Some(b.clone())
         );
         assert_eq!(set.lift(&b.key, Time::from_millis(300)).unwrap(), None);
+    }
+
+    #[test]
+    fn lifting_an_expired_block_answers_that_there_was_none() {
+        // Past `expires` the door's check answers NotFound; a lift must agree, not answer
+        // "lifted" for a block that no longer held.
+        let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+        let set = BlockSet::open(store).unwrap();
+        let b = block('a', 100);
+        set.put(b.clone(), Time::from_millis(10)).unwrap();
+        assert_eq!(set.holding(&b.key, Time::from_millis(200)), None);
+        assert_eq!(set.lift(&b.key, Time::from_millis(200)).unwrap(), None);
     }
 
     #[test]
