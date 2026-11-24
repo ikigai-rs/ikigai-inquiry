@@ -118,6 +118,12 @@ The layer files a deployment needs are in [`layers/`](layers): one JSON-LD conte
 layer, and closed shapes for the inquiry, spam and holding tuplespaces, the intents tuplespace
 and the examples channel. The tests open a real `ikigai-layers` host on exactly these files.
 
+Each of the five layer definitions sets `entry_max = "64KiB"`. The edge admits 10,000
+characters of any script, which is up to 40,000 bytes of text before escaping, and a layer
+host's default bound of 16 KiB refuses a long message in Cyrillic, Greek or CJK text, or one
+with emoji: the router answers an error and the inquiry is not stored. The tests' layers are
+configured the same way.
+
 ## The vocabulary
 
 [`src/vocabulary.ttl`](src/vocabulary.ttl) (`vocab::VOCABULARY`) is the `inq:` vocabulary, the
