@@ -727,3 +727,39 @@ fn bad_arguments_are_refused_before_anything_is_written() {
     ));
     assert_eq!(pending(&e.f, "inquiry-b").len(), 1);
 }
+
+#[test]
+fn a_block_intent_reaches_an_inquiry_past_the_layers_first_page() {
+    // 100 inquiries fill the layer host's default page, so the airlock must page to find the
+    // 101st's copy; reading one page skipped the person's block as "no pending copy".
+    let e = edge_fixture("past-a-page");
+    for i in 0..100 {
+        e.submit(&format!("u{i}@ham.example"), &format!("hello {i}"))
+            .unwrap();
+    }
+    let answer = e.submit("ana@spam.example", "hello from spam").unwrap();
+    // The answer names the tuple, `urn:layer:{layer}:inquiry:id:{id}` (`id_of` reads one page).
+    let id = answer.trim().rsplit(':').next().unwrap().to_string();
+    e.intend("block-domain", &id, "x1", &[]);
+    let applied = e.apply().unwrap();
+    assert!(applied.starts_with("blocked domain "), "{applied}");
+    assert_eq!(e.submit("bob@spam.example", "again").unwrap(), "blocked\n");
+}
+
+#[test]
+fn the_longest_message_in_any_script_is_routed_and_moved() {
+    // The edge admits 10,000 characters of any script. Two bytes each in Cyrillic and four in
+    // most emoji, so the tuple is past a layer host's default 16 KiB entry bound: each layer
+    // the edge and the client write is configured with `entry_max = "64KiB"`.
+    let e = edge_fixture("long-script");
+    for text in ["ж".repeat(10_000), "\u{1F600}".repeat(10_000)] {
+        let answer = e.submit("ana@example.org", &text).unwrap();
+        assert!(answer.starts_with("ham inquiry-b "), "{answer}");
+        let id = answer.trim().rsplit(':').next().unwrap().to_string();
+        // Through the client: a JSON-LD copy into spam, and an intent carrying the text.
+        act(&e.f, &person(BRIAN), "flag-spam", &id).unwrap();
+        act(&e.f, &person(BRIAN), "confirm-spam", &id).unwrap();
+    }
+    assert!(pending(&e.f, "inquiry-spam-b").is_empty());
+    assert_eq!(examples(&e.f).len(), 2);
+}

@@ -105,23 +105,27 @@ pub fn fixture_with(
     write(&config, "layers/inquiry.shapes.ttl", vocab::INQUIRY_SHAPES);
     write(&config, "layers/example.shapes.ttl", vocab::EXAMPLE_SHAPES);
     write(&config, "layers/intent.shapes.ttl", vocab::INTENT_SHAPES);
+    // Every layer as a deployment writes it: `entry_max = "64KiB"`, since the edge admits
+    // 10,000 characters of any script, past the layer host's default 16 KiB (README).
     for layer in ["inquiry-b", "inquiry-spam-b", "inquiry-hold-b"] {
         write(
             &config,
             &format!("layers/{layer}.toml"),
             "model = \"tuplespace\"\nshapes = \"inquiry.shapes.ttl\"\n\
-             context = \"inquiry.context.jsonld\"\n",
+             context = \"inquiry.context.jsonld\"\nentry_max = \"64KiB\"\n",
         );
     }
     write(
         &config,
         "layers/inquiry-intent-b.toml",
-        "model = \"tuplespace\"\nshapes = \"intent.shapes.ttl\"\ncontext = \"inquiry.context.jsonld\"\n",
+        "model = \"tuplespace\"\nshapes = \"intent.shapes.ttl\"\ncontext = \"inquiry.context.jsonld\"\n\
+         entry_max = \"64KiB\"\n",
     );
     write(
         &config,
         "layers/inquiry-example-b.toml",
-        "model = \"channel\"\nshapes = \"example.shapes.ttl\"\ncontext = \"inquiry.context.jsonld\"\n",
+        "model = \"channel\"\nshapes = \"example.shapes.ttl\"\ncontext = \"inquiry.context.jsonld\"\n\
+         entry_max = \"64KiB\"\n",
     );
     write(
         &config,

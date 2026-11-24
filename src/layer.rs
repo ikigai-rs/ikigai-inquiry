@@ -451,21 +451,43 @@ fn inquiry(node: &Value) -> Option<Inquiry> {
     })
 }
 
-/// The inquiries pending in `layer`, in feed order, read whole.
+/// Every tuple pending in the tuplespace `layer`, as JSON-LD nodes, paged. The layer host
+/// answers a default page of 100 when no `limit=` is given, so one unpaged read silently
+/// misses every tuple past the 100th.
+async fn pending_nodes(inv: &Invocation<'_>, layer: &str) -> Result<Vec<Value>> {
+    let mut all = Vec::new();
+    let mut after = 0;
+    loop {
+        let (after_s, limit) = (after.to_string(), PAGE.to_string());
+        let answer = inv
+            .issue(request(
+                Verb::Source,
+                tuples(layer)?,
+                &[("as", JSON_LD), ("after", &after_s), ("limit", &limit)],
+            ))
+            .await?;
+        let nodes = graph(&json_answer(&answer.bytes, layer)?);
+        let mut listed = 0;
+        for node in nodes {
+            if let Some(seq) = value(&node, "seq").and_then(|s| s.parse::<u64>().ok()) {
+                after = after.max(seq);
+                listed += 1;
+            }
+            all.push(node);
+        }
+        if listed < PAGE {
+            return Ok(all);
+        }
+    }
+}
+
+/// The inquiries pending in `layer`, in feed order, read whole (every page).
 pub async fn pending(inv: &Invocation<'_>, layer: &str) -> Result<Vec<Inquiry>> {
-    let answer = inv
-        .issue(request(
-            Verb::Source,
-            tuples(layer)?,
-            &[("as", "application/ld+json")],
-        ))
-        .await?;
-    let doc = json_answer(&answer.bytes, layer)?;
-    Ok(doc
-        .get("@graph")
-        .and_then(Value::as_array)
-        .map(|nodes| nodes.iter().filter_map(inquiry).collect())
-        .unwrap_or_default())
+    Ok(pending_nodes(inv, layer)
+        .await?
+        .iter()
+        .filter_map(inquiry)
+        .collect())
 }
 
 /// The pending copy of inquiry `id` in `layer`, if there is one.
@@ -484,23 +506,11 @@ fn names(subject: &str, layer: &str, id: &str) -> bool {
 /// Why inquiry `id` is not pending in `layer`: a Conflict naming who took it when a
 /// receipt says it was there, NotFound when it never was.
 pub async fn absent(inv: &Invocation<'_>, layer: &str, id: &str) -> Error {
-    let receipts = inv
-        .issue(request(
-            Verb::Source,
-            match tuples(layer) {
-                Ok(iri) => iri,
-                Err(e) => return e,
-            },
-            &[("state", "taken"), ("as", "application/json")],
-        ))
-        .await
-        .and_then(|answer| json_answer(&answer.bytes, layer));
-    let taker = receipts.ok().and_then(|doc| {
-        doc.get("receipts")?
-            .as_array()?
-            .iter()
-            .filter(|r| r["subject"].as_str().is_some_and(|s| names(s, layer, id)))
-            .filter_map(|r| r["taker"].as_str().map(str::to_string))
+    // Every page of receipts: the latest take of a copy of `id` is the one that answers.
+    let taker = receipts(inv, layer).await.ok().and_then(|all| {
+        all.into_iter()
+            .filter(|r| names(&r.subject, layer, id))
+            .map(|r| r.taker)
             .next_back()
     });
     match taker {
@@ -638,11 +648,11 @@ fn intent_of(node: &Value) -> Option<Intent> {
 
 /// The intents pending in `layer`, in feed order.
 pub async fn intents(inv: &Invocation<'_>, layer: &str) -> Result<Vec<Intent>> {
-    let answer = inv
-        .issue(request(Verb::Source, tuples(layer)?, &[("as", JSON_LD)]))
-        .await?;
-    let doc = json_answer(&answer.bytes, layer)?;
-    Ok(graph(&doc).iter().filter_map(intent_of).collect())
+    Ok(pending_nodes(inv, layer)
+        .await?
+        .iter()
+        .filter_map(intent_of)
+        .collect())
 }
 
 /// Say one entry in a channel layer.

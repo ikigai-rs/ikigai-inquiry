@@ -379,3 +379,17 @@ fn sender_holds_only_a_sender_key() {
     assert_eq!(intents(&f).len(), 1);
     assert_eq!(pending(&f, "inquiry-b").len(), 1);
 }
+
+#[test]
+fn an_action_reaches_an_inquiry_past_the_layers_first_page() {
+    // The layer host answers 100 tuples unless asked for more, so a client that reads one
+    // page cannot see the 101st spam, and cannot act on it.
+    let f = fixture("past-a-page", |m| m);
+    let ids: Vec<String> = (0..101).map(|i| format!("a{i}")).collect();
+    for id in &ids {
+        arrive(&f, "inquiry-spam-b", arrival(id, "a.example", "text"));
+    }
+    let said = act(&f, &person(BRIAN), "remove", "a100").unwrap();
+    assert_eq!(said, "Removed inquiry a100 from spam.");
+    assert_eq!(pending(&f, "inquiry-spam-b").len(), 100);
+}
