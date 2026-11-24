@@ -2,6 +2,7 @@
 name = "ikigai-inquiry"
 version = "0.2.1"
 edition = "2021"
+rust-version = "1.89"
 license = "MIT OR Apache-2.0"
 description = "Inquiries from public contact forms as ikigai resources: routed into layers by a classification funnel, with a layers client any host mounts."
 authors = ["Brian Sletten <brian.sletten@gmail.com>"]
