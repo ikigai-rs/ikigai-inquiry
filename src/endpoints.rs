@@ -296,14 +296,22 @@ impl Endpoint for Route {
                 ),
             ));
         }
-        let sender_key = edge.keys.address(email).map_err(|e| invalid("email", e))?;
-        let domain_key = edge
+        // A block is looked up under every key the sender has had: the current one, and each
+        // an earlier release computed, so a block written before an upgrade still holds.
+        let sender_keys = edge
             .keys
-            .domain_of(email)
+            .address_keys(email)
             .map_err(|e| invalid("email", e))?;
+        let domain_keys = edge
+            .keys
+            .domain_keys_of(email)
+            .map_err(|e| invalid("email", e))?;
+        let sender_key = sender_keys[0].clone();
         let date = time::date(now);
-        if edge.blocks.holding(&sender_key, now).is_some()
-            || edge.blocks.holding(&domain_key, now).is_some()
+        if sender_keys
+            .iter()
+            .chain(&domain_keys)
+            .any(|key| edge.blocks.holding(key, now).is_some())
         {
             edge.counts
                 .add(&date, Tally::Blocked { site })
@@ -441,8 +449,9 @@ impl Endpoint for SenderKeyDoor {
             .title("The sender key of an address or a domain")
             .summary(
                 "Keyed BLAKE3 over the address, trimmed and lowercased, or over \
-                 `domain:<the domain, lowercased>`, under the host's key. Nothing \
-                 provider-specific is folded.",
+                 `domain:<the domain, lowercased>`, under the host's key; characters a page \
+                 shows as nothing are dropped, a domain's full stops are spelled `.` and its \
+                 root dot is dropped. Nothing provider-specific is folded.",
             )
             .verb(Verb::Source)
             .verb(Verb::Meta)
@@ -658,9 +667,12 @@ impl Apply {
     ) -> Result<Applied> {
         let edge = &self.0;
         let id = &intent.inquiry;
-        let key = match (scope, &intent.sender) {
-            (Scope::Address, Some(sender)) => Key::parse(sender)
-                .map_err(|e| Error::NotFound(format!("the intent's sender key: {e}")))?,
+        // A domain is keyed from its address, so its earlier releases' keys are known too, and
+        // lifting a domain lifts a block one of them wrote. An address is keyed from the key the
+        // inquiry carries, which is the key a block on it was written under.
+        let keys = match (scope, &intent.sender) {
+            (Scope::Address, Some(sender)) => vec![Key::parse(sender)
+                .map_err(|e| Error::NotFound(format!("the intent's sender key: {e}")))?],
             _ => {
                 let copy = self.layer_copy(inv, id).await?.ok_or_else(|| {
                     Error::NotFound(format!(
@@ -668,11 +680,14 @@ impl Apply {
                     ))
                 })?;
                 match scope {
-                    Scope::Address => copy.sender.as_deref().map(Key::parse),
+                    Scope::Address => copy
+                        .sender
+                        .as_deref()
+                        .map(|sender| Key::parse(sender).map(|key| vec![key])),
                     Scope::Domain => copy
                         .reply_to
                         .as_deref()
-                        .map(|address| edge.keys.domain_of(address)),
+                        .map(|address| edge.keys.domain_keys_of(address)),
                 }
                 .ok_or_else(|| Error::NotFound(format!("inquiry {id} has no sender to key")))?
                 .map_err(|e| Error::NotFound(format!("inquiry {id}'s sender: {e}")))?
@@ -682,9 +697,17 @@ impl Apply {
         if let Some(note) = &intent.note {
             check_label(note).map_err(|e| invalid("note", e))?;
         }
+        let key = keys[0].clone();
         if !blocking {
-            let lifted = edge.blocks.lift(&key, now).map_err(Error::Endpoint)?;
-            let (text, mut value) = lift_parts(&key, lifted.is_some());
+            let mut lifted = false;
+            for key in &keys {
+                lifted |= edge
+                    .blocks
+                    .lift(key, now)
+                    .map_err(Error::Endpoint)?
+                    .is_some();
+            }
+            let (text, mut value) = lift_parts(&key, lifted);
             value["intent"] = json!(subject);
             return Ok((text, value));
         }
