@@ -763,3 +763,23 @@ fn the_longest_message_in_any_script_is_routed_and_moved() {
     assert!(pending(&e.f, "inquiry-spam-b").is_empty());
     assert_eq!(examples(&e.f).len(), 2);
 }
+
+/// A domain written as a fully qualified name, with its root dot (`bulk.test.`), is the same
+/// domain and the same mailbox: it does not slip past a block on `bulk.test`.
+#[test]
+fn a_trailing_root_dot_does_not_slip_past_a_block() {
+    let e = edge_fixture("root-dot");
+    let id = e.id_of(&e.submit("a@bulk.test", "cheap pills").unwrap());
+    e.intend("block-domain", &id, "d1", &[]);
+    assert!(e.apply().unwrap().starts_with("blocked domain "));
+    assert_eq!(e.submit("b@bulk.test.", "hello").unwrap(), "blocked\n");
+    assert_eq!(e.submit("b@BULK.TEST. ", "hello").unwrap(), "blocked\n");
+    assert_eq!(
+        e.keys.address("ana@example.com.").unwrap(),
+        e.keys.address("ana@example.com").unwrap()
+    );
+    assert_eq!(
+        e.keys.domain("example.com.").unwrap(),
+        e.keys.domain("example.com").unwrap()
+    );
+}

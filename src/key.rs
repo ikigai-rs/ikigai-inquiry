@@ -2,7 +2,8 @@
 //! without holding the address.
 //!
 //! - an **address key** is the keyed hash of the address, trimmed and lowercased, its invisible
-//!   formatting characters (zero-width marks, the BOM, bidirectional marks) dropped;
+//!   formatting characters (zero-width marks, the BOM, bidirectional marks) and its domain's
+//!   root dot (`example.com.`) dropped;
 //! - a **domain key** is the keyed hash of `domain:<the domain, so normalized>`, so no
 //!   address hashes to a domain's key (an address always holds an `@`, and the `domain:` form
 //!   never does).
@@ -168,7 +169,7 @@ impl SenderKeys {
     }
 
     /// The key of an address: trimmed and lowercased, its invisible formatting characters
-    /// dropped, nothing else folded.
+    /// and its domain's root dot dropped, nothing else folded.
     ///
     /// ```
     /// use ikigai_inquiry::SenderKeys;
@@ -185,17 +186,23 @@ impl SenderKeys {
         let (local, domain) = address
             .rsplit_once('@')
             .ok_or("an address holds an `@`: refused")?;
+        let domain = rooted(domain);
         if local.is_empty() || domain.is_empty() {
             return Err("an address has a name before its `@` and a domain after it".into());
         }
-        Ok(self.hash(address.as_bytes()))
+        Ok(self.hash(format!("{local}@{domain}").as_bytes()))
     }
 
-    /// The key of a domain: `domain:` and the domain, trimmed and lowercased.
+    /// The key of a domain: `domain:` and the domain, trimmed and lowercased, its root dot
+    /// dropped.
     pub fn domain(&self, domain: &str) -> Result<Key, String> {
         let domain = normalize(domain, "domain")?;
         if domain.contains('@') {
             return Err("a domain holds no `@`: refused".into());
+        }
+        let domain = rooted(&domain);
+        if domain.is_empty() {
+            return Err("an empty domain: refused".into());
         }
         Ok(self.hash(format!("domain:{domain}").as_bytes()))
     }
@@ -225,6 +232,12 @@ impl SenderKeys {
         }
         hasher.finalize().to_hex()[..32].to_string()
     }
+}
+
+/// A domain without its root dot: `example.com.` is the fully qualified form of
+/// `example.com`, the same domain and the same mailboxes, so it is not a new key past a block.
+fn rooted(domain: &str) -> &str {
+    domain.strip_suffix('.').unwrap_or(domain)
 }
 
 fn normalize(text: &str, what: &str) -> Result<String, String> {
