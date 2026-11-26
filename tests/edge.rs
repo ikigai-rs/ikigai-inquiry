@@ -783,3 +783,96 @@ fn a_trailing_root_dot_does_not_slip_past_a_block() {
         e.keys.domain("example.com").unwrap()
     );
 }
+
+/// A character a page shows as nothing (any of Unicode's default-ignorable code points, not only
+/// the zero-width marks and bidirectional controls), or a full stop IDNA reads as `.`, leaves
+/// the sender the one a person blocked: by domain and by address.
+#[test]
+fn a_block_holds_through_an_ignorable_mark_or_a_spelling_of_the_same_domain() {
+    let e = edge_fixture("ignorable");
+    let id = e.id_of(&e.submit("ana@spam.example", "pills").unwrap());
+    e.intend("block-domain", &id, "x1", &[]);
+    assert!(e.apply().unwrap().starts_with("blocked domain "));
+    for address in [
+        "bob@spam.example\u{AD}",
+        "bob@sp\u{AD}am.example",
+        "bob@spam.example\u{34F}",
+        "bob@spam.example\u{FE0F}",
+        "bob@spam.example\u{3164}",
+        "bob@spam.example\u{E0041}",
+        "bob@spam.example.",
+        "bob@spam\u{3002}example",
+        "bob@spam\u{FF0E}example",
+        "bob@spam\u{FF61}example\u{3002}",
+    ] {
+        assert_eq!(
+            e.submit(address, "hello").unwrap(),
+            "blocked\n",
+            "{address:?}"
+        );
+    }
+    // And an address block, through the same marks in the name before the `@`.
+    let id = e.id_of(&e.submit("eve@ham.example", "hello").unwrap());
+    e.intend("block", &id, "x2", &[]);
+    assert!(e.apply().unwrap().starts_with("blocked address "));
+    for address in ["e\u{AD}ve@ham.example", "eve\u{34F}@ham.example"] {
+        assert_eq!(
+            e.submit(address, "hello").unwrap(),
+            "blocked\n",
+            "{address:?}"
+        );
+    }
+}
+
+/// A block an earlier release wrote names the sender as that release spelled it: 0.2.0 and
+/// earlier trimmed and lowercased it, 0.2.1 also dropped the zero-width and bidirectional
+/// marks, neither dropped a root dot. After the upgrade such a block still holds on that
+/// sender, and lifting the domain lifts it.
+#[test]
+fn a_block_an_earlier_release_wrote_still_holds_after_the_upgrade() {
+    let e = edge_fixture("earlier-block");
+    // An inquiry from the domain before the block, so there is a copy to lift it from.
+    let id = e.id_of(&e.submit("ann@sp\u{AD}am.example.", "first").unwrap());
+    let secret = [11u8; 32];
+    let old = |text: &str| {
+        blake3::keyed_hash(&secret, text.as_bytes())
+            .to_hex()
+            .to_string()
+    };
+    let record = |key: String, scope: &str| {
+        json!({
+            "created": START,
+            "expires": START + 30 * DAY_MS,
+            "key": key,
+            "label": null,
+            "scope": scope,
+        })
+    };
+    // The block document as 0.2.1 saved it.
+    let document = json!({ "blocks": [
+        record(old("e\u{AD}ve@ham.example"), "address"),
+        record(old("domain:sp\u{AD}am.example."), "domain"),
+    ]});
+    e.store
+        .save("block", document.to_string().as_bytes())
+        .unwrap();
+    for address in [
+        "e\u{AD}ve@ham.example",
+        " E\u{AD}VE@ham.example",
+        "bob@sp\u{AD}am.example.",
+        "bob@sp\u{200B}\u{AD}am.example.",
+    ] {
+        assert_eq!(
+            e.submit(address, "hello").unwrap(),
+            "blocked\n",
+            "{address:?}"
+        );
+    }
+    e.intend("unblock-domain", &id, "u1", &[]);
+    let lifted = e.apply().unwrap();
+    assert!(lifted.starts_with("lifted "), "{lifted}");
+    assert_ne!(
+        e.submit("bob@sp\u{AD}am.example.", "hello").unwrap(),
+        "blocked\n"
+    );
+}
